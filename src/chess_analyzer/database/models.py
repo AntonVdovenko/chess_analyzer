@@ -138,7 +138,7 @@ class Embedding(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     position_id = Column(Integer, ForeignKey("positions.id"), nullable=False, index=True)
-    embedding_vector = Column(postgresql.ARRAY(postgresql.FLOAT8), nullable=False)
+    embedding_vector = Column(postgresql.ARRAY(Float), nullable=False)
     embedding_cluster = Column(Integer, nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

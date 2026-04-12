@@ -1,0 +1,82 @@
+import pytest
+from unittest.mock import Mock
+from src.chess_analyzer.ml_models.move_predictor import MovePredictor
+
+
+def test_move_predictor_init():
+    """Test MovePredictor initializes correctly"""
+    predictor = MovePredictor(min_position_frequency=5)
+    assert predictor.min_position_frequency == 5
+    assert predictor.move_distributions == {}
+
+
+def test_move_predictor_fit_empty_games():
+    """Test fit with empty games list"""
+    predictor = MovePredictor()
+    predictor.fit([])
+    assert predictor.move_distributions == {}
+
+
+def test_move_predictor_fit_with_games():
+    """Test fit learns move patterns correctly"""
+    # Create mock game with positions
+    position1 = Mock()
+    position1.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    position1.player_move = "e2e4"
+
+    position2 = Mock()
+    position2.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    position2.player_move = "d2d4"
+
+    game = Mock()
+    game.positions = [position1, position2]
+
+    predictor = MovePredictor()
+    predictor.fit([game])
+
+    # Should have learned the position
+    fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    assert fen in predictor.move_distributions
+    assert predictor.move_distributions[fen]["e2e4"] == 1
+    assert predictor.move_distributions[fen]["d2d4"] == 1
+
+    # Test prediction
+    assert predictor.predict(fen, "e2e4") == 0.5
+    assert predictor.predict(fen, "d2d4") == 0.5
+    assert predictor.predict(fen, "a2a3") == 0.0
+
+
+def test_move_predictor_unusual_moves():
+    """Test unusual move detection"""
+    # Create training data with many e2e4 moves and few h2h4 moves
+    position_configs = []
+    for i in range(9):
+        pos = Mock()
+        pos.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        pos.player_move = "e2e4"
+        position_configs.append(pos)
+
+    # Add one unusual move
+    position_h = Mock()
+    position_h.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    position_h.player_move = "h2h4"
+    position_configs.append(position_h)
+
+    training_game = Mock()
+    training_game.positions = position_configs
+
+    predictor = MovePredictor()
+    predictor.fit([training_game])
+
+    # Test game with the unusual move
+    test_position = Mock()
+    test_position.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    test_position.player_move = "h2h4"
+
+    test_game = Mock()
+    test_game.positions = [test_position]
+
+    unusual = predictor.get_unusual_moves(test_game, threshold=0.2)
+    assert len(unusual) == 1
+    assert unusual[0]["move"] == "h2h4"
+    assert unusual[0]["probability"] == 0.1  # 1 out of 10 moves is h2h4
