@@ -1,6 +1,5 @@
 from typing import List, Dict, Optional
 from src.chess_analyzer.database.models import Game, Position
-import hashlib
 
 
 class MovePredictor:
@@ -40,6 +39,14 @@ class MovePredictor:
                         self.move_distributions[pos_key][move] = 0
                     self.move_distributions[pos_key][move] += 1
 
+        # Filter out positions seen fewer than min_position_frequency times
+        filtered = {}
+        for pos_key, moves_dict in self.move_distributions.items():
+            total_moves = sum(moves_dict.values())
+            if total_moves >= self.min_position_frequency:
+                filtered[pos_key] = moves_dict
+        self.move_distributions = filtered
+
     def predict(self, position_fen: str, move: str) -> float:
         """
         Return probability of this move in this position (0-1)
@@ -64,7 +71,7 @@ class MovePredictor:
         if total == 0:
             return 0.0
 
-        return float(move_count) / float(total)
+        return float(move_count) / total
 
     def get_unusual_moves(self, game: Game, threshold: float = 0.2) -> List[Dict]:
         """
