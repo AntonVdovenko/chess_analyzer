@@ -3,14 +3,15 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Float,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -23,25 +24,20 @@ class Game(Base):
 
     __tablename__ = "games"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    game_id = Column(String(50), unique=True, nullable=False, index=True)
-    player_username = Column(String(100), nullable=False, index=True)
-    opponent_username = Column(String(100), nullable=False)
-    player_color = Column(String(5), nullable=False)  # "white" or "black"
-    result = Column(String(10), nullable=False)  # "win", "loss", "draw"
-    time_control = Column(String(50), nullable=False)  # e.g. "bullet", "blitz", "rapid"
-    played_at = Column(DateTime, nullable=False, index=True)
-    pgn = Column(Text, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), index=True)
+    opponent_username = Column(String(100))
+    opponent_rating = Column(Integer, nullable=True)
+    time_control = Column(String(50))
+    result = Column(String(10))  # "win", "loss", "draw"
+    date = Column(DateTime, index=True)
+    pgn = Column(Text)
+    white_elo = Column(Integer, nullable=True)
+    black_elo = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     positions = relationship("Position", back_populates="game", cascade="all, delete-orphan")
-    stats = relationship(
-        "Stats", back_populates="game", uselist=False, cascade="all, delete-orphan"
-    )
-
-    __table_args__ = (UniqueConstraint("game_id", "player_username", name="uq_game_player"),)
 
 
 class Position(Base):
@@ -49,56 +45,51 @@ class Position(Base):
 
     __tablename__ = "positions"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    game_id = Column(Integer, ForeignKey("games.id"), nullable=False, index=True)
-    move_number = Column(Integer, nullable=False)  # 1-indexed
-    fen = Column(String(100), nullable=False)
-    player_side = Column(String(5), nullable=False)  # "white" or "black"
-    best_move = Column(String(10), nullable=True)  # e.g. "e2e4"
-    actual_move = Column(String(10), nullable=False)
-    centipawn_loss = Column(Float, nullable=True)  # Difference in eval before/after move
-    is_blunder = Column(Integer, nullable=False, default=0)  # Boolean: 1 or 0
+    id = Column(Integer, primary_key=True, index=True)
+    game_id = Column(Integer, ForeignKey("games.id"), index=True)
+    move_number = Column(Integer)
+    fen = Column(String(100), index=True)
+    player_move = Column(String(10))
+    engine_best_move = Column(String(10))
+    evaluation_loss = Column(Float)
+    evaluation_before = Column(Float)
+    evaluation_after = Column(Float)
+    is_opening = Column(Boolean, default=False)
+    is_middlegame = Column(Boolean, default=False)
+    is_endgame = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     game = relationship("Game", back_populates="positions")
-    pattern = relationship(
-        "Pattern", back_populates="position", uselist=False, cascade="all, delete-orphan"
-    )
-
-    __table_args__ = (UniqueConstraint("game_id", "move_number", name="uq_game_move"),)
 
 
 class Pattern(Base):
-    """Represents a weakness pattern identified in positions."""
+    """Represents aggregated weakness patterns across multiple games."""
 
     __tablename__ = "patterns"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    position_id = Column(Integer, ForeignKey("positions.id"), nullable=False, index=True)
-    cluster_id = Column(Integer, nullable=False)  # K-means cluster assignment
-    pattern_type = Column(String(50), nullable=False)  # e.g. "opening_mistake", "tactical_miss"
-    severity = Column(Float, nullable=False)  # 0.0 to 1.0 - how severe the weakness
+    id = Column(Integer, primary_key=True, index=True)
+    pattern_name = Column(String(200))
+    weakness_type = Column(String(50))
+    frequency = Column(Integer)
+    game_ids = Column(JSON)
+    position_features = Column(JSON)
+    average_eval_loss = Column(Float)
+    player_username = Column(String(100), index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    # Relationships
-    position = relationship("Position", back_populates="pattern")
 
 
 class Stats(Base):
-    """Represents aggregated statistics for a game analysis."""
+    """Represents aggregated statistics per player."""
 
     __tablename__ = "stats"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    game_id = Column(Integer, ForeignKey("games.id"), nullable=False, unique=True, index=True)
-    total_blunders = Column(Integer, nullable=False, default=0)
-    total_centipawn_loss = Column(Float, nullable=False, default=0.0)
-    average_centipawn_loss = Column(Float, nullable=False, default=0.0)
-    accuracy = Column(Float, nullable=False, default=0.0)  # Percentage 0-100
-    weak_phases = Column(String(100), nullable=True)  # JSON-encoded list of phases
+    id = Column(Integer, primary_key=True, index=True)
+    player_username = Column(String(100), index=True)
+    opening_name = Column(String(200), nullable=True)
+    total_games = Column(Integer)
+    total_accuracy = Column(Float)
+    accuracy_by_phase = Column(JSON)
+    win_loss_ratio = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    game = relationship("Game", back_populates="stats")
