@@ -1,7 +1,6 @@
 """Analyze chess positions using Stockfish engine."""
 
 import logging
-from typing import Dict, List, Optional
 
 import chess
 import chess.engine
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 class PositionAnalyzer:
     """Analyze chess positions using Stockfish engine."""
 
-    def __init__(self, stockfish_path: Optional[str] = None):
+    def __init__(self, stockfish_path: str | None = None):
         """Initialize the position analyzer with Stockfish engine.
 
         Args:
@@ -48,8 +47,8 @@ class PositionAnalyzer:
         return abs(eval_before - eval_after)
 
     def analyze_position(
-        self, fen: str, depth: Optional[int] = None, time_limit: float = 1.0
-    ) -> Dict:
+        self, fen: str, depth: int | None = None, time_limit: float = 1.0
+    ) -> dict:
         """Analyze a position using Stockfish.
 
         Args:
@@ -86,7 +85,7 @@ class PositionAnalyzer:
             logger.error(f"Error analyzing position: {e}")
             raise
 
-    def _evaluation_to_float(self, score: Optional[chess.engine.Score]) -> float:
+    def _evaluation_to_float(self, score: chess.engine.Score | None) -> float:
         """Convert Stockfish evaluation to float (pawns).
 
         Args:
@@ -105,7 +104,7 @@ class PositionAnalyzer:
         # Convert centipawns to pawns
         return float(score.cp) / 100.0
 
-    def get_acpl(self, positions: List[Dict]) -> float:
+    def get_acpl(self, positions: list[dict]) -> float:
         """Calculate ACPL (Average Centipawn Loss) for a game.
 
         ACPL is the average absolute difference between evaluation before
