@@ -1,7 +1,6 @@
 """SQLAlchemy ORM models for chess analyzer."""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     Column,
@@ -38,7 +37,9 @@ class Game(Base):
 
     # Relationships
     positions = relationship("Position", back_populates="game", cascade="all, delete-orphan")
-    stats = relationship("Stats", back_populates="game", uselist=False, cascade="all, delete-orphan")
+    stats = relationship(
+        "Stats", back_populates="game", uselist=False, cascade="all, delete-orphan"
+    )
 
     __table_args__ = (UniqueConstraint("game_id", "player_username", name="uq_game_player"),)
 
@@ -61,7 +62,9 @@ class Position(Base):
 
     # Relationships
     game = relationship("Game", back_populates="positions")
-    pattern = relationship("Pattern", back_populates="position", uselist=False, cascade="all, delete-orphan")
+    pattern = relationship(
+        "Pattern", back_populates="position", uselist=False, cascade="all, delete-orphan"
+    )
 
     __table_args__ = (UniqueConstraint("game_id", "move_number", name="uq_game_move"),)
 
