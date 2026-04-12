@@ -1,5 +1,6 @@
 """SQLAlchemy ORM models for chess analyzer."""
 
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -12,7 +13,9 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    func,
 )
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -93,3 +96,66 @@ class Stats(Base):
     win_loss_ratio = Column(Float)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class MovePrediction(Base):
+    """Move predictions for unusual moves."""
+
+    __tablename__ = "move_predictions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=False, index=True)
+    position_fen = Column(String(200), nullable=False)
+    actual_move = Column(String(10), nullable=False)
+    predicted_move = Column(String(10), nullable=True)
+    probability_score = Column(Float, nullable=False)
+    is_unusual = Column(Boolean, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    game = relationship("Game", backref="move_predictions")
+
+
+class Anomaly(Base):
+    """Rare, costly mistakes detected by Isolation Forest."""
+
+    __tablename__ = "anomalies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=False, index=True)
+    position_fen = Column(String(200), nullable=False)
+    anomaly_score = Column(Float, nullable=False, index=True)
+    centipawn_loss = Column(Float, nullable=False)
+    reason = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    game = relationship("Game", backref="anomalies")
+
+
+class Embedding(Base):
+    """Position embeddings for semantic similarity."""
+
+    __tablename__ = "embeddings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    position_id = Column(Integer, ForeignKey("positions.id"), nullable=False, index=True)
+    embedding_vector = Column(postgresql.ARRAY(Float), nullable=False)
+    embedding_cluster = Column(Integer, nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    position = relationship("Position", backref="embedding")
+
+
+class AdvancedAnalysisJob(Base):
+    """Track advanced analysis job progress."""
+
+    __tablename__ = "advanced_analysis_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(255), nullable=False, index=True)
+    job_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    status = Column(String(50), nullable=False, index=True, default="processing")
+    move_predictor_done = Column(Boolean, default=False)
+    anomaly_detector_done = Column(Boolean, default=False)
+    embedder_done = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
