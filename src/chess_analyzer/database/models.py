@@ -138,7 +138,7 @@ class Embedding(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     position_id = Column(Integer, ForeignKey("positions.id"), nullable=False, index=True)
-    embedding_vector = Column(postgresql.ARRAY(Float), nullable=False)
+    embedding_vector = Column(postgresql.ARRAY(postgresql.FLOAT8), nullable=False)
     embedding_cluster = Column(Integer, nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -152,7 +152,7 @@ class AdvancedAnalysisJob(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(255), nullable=False, index=True)
-    job_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    job_id = Column(postgresql.UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4)
     status = Column(String(50), nullable=False, index=True, default="processing")
     move_predictor_done = Column(Boolean, default=False)
     anomaly_detector_done = Column(Boolean, default=False)
