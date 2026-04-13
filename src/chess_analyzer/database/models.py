@@ -159,3 +159,50 @@ class AdvancedAnalysisJob(Base):
     embedder_done = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class StudyPlan(Base):
+    """Represents a study plan for addressing a weakness pattern."""
+
+    __tablename__ = "study_plans"
+
+    id = Column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(String(255), nullable=False, index=True)
+    weakness_id = Column(Integer, ForeignKey("patterns.id"), nullable=False)
+    priority_score = Column(Float, nullable=False, index=True)
+    status = Column(String(50), nullable=False, index=True)
+    marked_studied_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
+
+    # Relationships
+    weakness = relationship("Pattern", foreign_keys=[weakness_id])
+    study_sessions = relationship("StudySession", back_populates="study_plan", cascade="all, delete-orphan")
+
+
+class ConceptMap(Base):
+    """Represents a concept related to a weakness pattern."""
+
+    __tablename__ = "concept_maps"
+
+    id = Column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    weakness_id = Column(Integer, ForeignKey("patterns.id"), nullable=False, index=True)
+    concept_type = Column(String(100), nullable=False)
+    concept_name = Column(String(255), nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+
+
+class StudySession(Base):
+    """Represents a session of study for a study plan."""
+
+    __tablename__ = "study_sessions"
+
+    id = Column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_plan_id = Column(postgresql.UUID(as_uuid=True), ForeignKey("study_plans.id"), nullable=False, index=True)
+    games_reviewed = Column(JSON, default=list)
+    engine_analysis_count = Column(Integer, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+
+    # Relationships
+    study_plan = relationship("StudyPlan", back_populates="study_sessions")
