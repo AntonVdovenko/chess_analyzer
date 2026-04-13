@@ -1,11 +1,11 @@
 import React from 'react';
-import PatternExplorer from './components/PatternExplorer';
+import StudyPlan from './components/StudyPlan';
 import './App.css';
 
 function App() {
   return (
     <div className="App">
-      <PatternExplorer />
+      <StudyPlan />
     </div>
   );
 }
