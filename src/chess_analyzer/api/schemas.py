@@ -1,7 +1,8 @@
 """Pydantic schemas for API request/response models."""
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -148,6 +149,119 @@ class PatternDetailResponse(BaseModel):
     anomaly_count: int = Field(0, description="Count of anomalies in pattern")
     similar_patterns: List[int] = Field(default_factory=list, description="IDs of similar patterns")
     study_priority: str = Field(..., description="Priority: critical, high, or medium")
+
+    class Config:
+        from_attributes = True
+
+
+# Phase 3 Study Plan Schemas
+
+class StudyPlanGenerateRequest(BaseModel):
+    """Request to generate a personalized study plan for a player.
+
+    Triggers analysis of player's weakness patterns and creates a study plan
+    with frequency-based prioritization.
+    """
+
+    username: str = Field(..., description="Chess.com username to generate study plan for")
+    game_limit: int = Field(100, description="Maximum games to consider for analysis", ge=1, le=5000)
+
+
+class StudyPlanGenerateResponse(BaseModel):
+    """Response from generating a study plan.
+
+    Contains summary of created study plans and priority distribution.
+    """
+
+    username: str = Field(..., description="Username for which study plan was generated")
+    total_weaknesses: int = Field(..., description="Total weakness patterns found", ge=0)
+    study_plans_created: int = Field(..., description="Number of study plans created", ge=0)
+    priority_distribution: Dict[str, int] = Field(
+        ..., description="Distribution of plans: {high, medium, low}"
+    )
+
+
+class StudyPlanResponse(BaseModel):
+    """Response model for a single study plan.
+
+    Contains plan metadata, priority score, and concept count.
+    """
+
+    id: str = Field(..., description="UUID of the study plan")
+    user_id: str = Field(..., description="User identifier")
+    weakness_id: int = Field(..., description="Database ID of weakness pattern")
+    priority_score: float = Field(..., description="Priority score (0-10)", ge=0, le=10)
+    status: str = Field(..., description="Plan status: active, completed, paused")
+    concept_count: int = Field(..., description="Number of learning concepts", ge=0)
+    created_at: datetime = Field(..., description="When plan was created")
+
+    class Config:
+        from_attributes = True
+
+
+class MarkStudiedRequest(BaseModel):
+    """Request body for marking a study plan as studied.
+
+    Empty body - uses study plan ID from URL path.
+    """
+
+    pass
+
+
+class MarkStudiedResponse(BaseModel):
+    """Response when marking a study plan as studied.
+
+    Confirms status change and timestamp of study completion.
+    """
+
+    id: str = Field(..., description="UUID of the study plan")
+    status: str = Field(..., description="New status of plan")
+    marked_studied_at: datetime = Field(..., description="When plan was marked as studied")
+
+    class Config:
+        from_attributes = True
+
+
+class ConceptListResponse(BaseModel):
+    """Response with list of learning concepts.
+
+    Contains concepts mapped to a weakness pattern (theory, opening, position type).
+    """
+
+    concepts: List[Dict[str, str]] = Field(
+        ...,
+        description="List of concepts with structure {type, name}",
+    )
+
+
+class StudyProgressResponse(BaseModel):
+    """Response for study progress tracking.
+
+    Shows completion metrics and progress on study plans.
+    """
+
+    user_id: str = Field(..., description="User identifier")
+    total_plans: int = Field(..., description="Total study plans created", ge=0)
+    active_plans: int = Field(..., description="Number of active plans", ge=0)
+    completed_plans: int = Field(..., description="Number of completed plans", ge=0)
+    completion_rate: float = Field(
+        ..., description="Percentage of plans completed", ge=0, le=100
+    )
+
+
+class StudyGameDetailResponse(BaseModel):
+    """Response with detailed game information for a study plan.
+
+    Contains game result, accuracy, and position evaluation details.
+    """
+
+    game_id: int = Field(..., description="Database ID of the game")
+    study_plan_id: str = Field(..., description="UUID of related study plan")
+    weakness_id: int = Field(..., description="Database ID of weakness pattern")
+    result: str = Field(..., description="Game result: win, loss, draw")
+    accuracy: float = Field(..., description="Player move accuracy (%)", ge=0, le=100)
+    eval_loss: float = Field(..., description="Average centipawn loss in game", ge=0)
+    position_fen: str = Field(..., description="FEN string of critical position")
 
     class Config:
         from_attributes = True
