@@ -1,8 +1,7 @@
 """Tests for StudyPlan, ConceptMap, and StudySession ORM models."""
 
 import uuid
-from datetime import datetime
-from unittest.mock import Mock, patch
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import create_engine, event
@@ -147,7 +146,7 @@ class TestStudyPlanModel:
         assert study_plan.marked_studied_at is None
 
         # Mark as studied
-        study_plan.marked_studied_at = datetime.utcnow()
+        study_plan.marked_studied_at = datetime.now(timezone.utc)
         test_db.commit()
         test_db.refresh(study_plan)
 
@@ -399,7 +398,7 @@ class TestStudySessionModel:
         assert study_session.completed_at is None
 
         # Mark as completed
-        study_session.completed_at = datetime.utcnow()
+        study_session.completed_at = datetime.now(timezone.utc)
         test_db.commit()
         test_db.refresh(study_session)
 

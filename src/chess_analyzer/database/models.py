@@ -81,6 +81,9 @@ class Pattern(Base):
     player_username = Column(String(100), index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    # Relationships
+    study_plans = relationship("StudyPlan", back_populates="weakness", cascade="all, delete-orphan")
+
 
 class Stats(Base):
     """Represents aggregated statistics per player."""
@@ -167,16 +170,16 @@ class StudyPlan(Base):
     __tablename__ = "study_plans"
 
     id = Column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
+    user_id = Column(String(255), nullable=False, index=True)  # User identifier for access control
     weakness_id = Column(Integer, ForeignKey("patterns.id"), nullable=False)
-    priority_score = Column(Float, nullable=False, index=True)
-    status = Column(String(50), nullable=False, index=True)
-    marked_studied_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.utcnow())
-    updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
+    priority_score = Column(Float, nullable=False, index=True)  # Score from 0-10 indicating urgency
+    status = Column(String(50), nullable=False, index=True)  # "active", "completed", "paused"
+    marked_studied_at = Column(DateTime, nullable=True)  # When user marked pattern as studied
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    weakness = relationship("Pattern", foreign_keys=[weakness_id])
+    weakness = relationship("Pattern", back_populates="study_plans", foreign_keys=[weakness_id])
     study_sessions = relationship("StudySession", back_populates="study_plan", cascade="all, delete-orphan")
 
 
@@ -187,9 +190,9 @@ class ConceptMap(Base):
 
     id = Column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     weakness_id = Column(Integer, ForeignKey("patterns.id"), nullable=False, index=True)
-    concept_type = Column(String(100), nullable=False)
-    concept_name = Column(String(255), nullable=False, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    concept_type = Column(String(100), nullable=False)  # e.g., "tactic", "strategy", "opening"
+    concept_name = Column(String(255), nullable=False, index=True)  # e.g., "Pin", "Centralization"
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class StudySession(Base):
@@ -199,10 +202,10 @@ class StudySession(Base):
 
     id = Column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     study_plan_id = Column(postgresql.UUID(as_uuid=True), ForeignKey("study_plans.id"), nullable=False, index=True)
-    games_reviewed = Column(JSON, default=list)
-    engine_analysis_count = Column(Integer, nullable=False)
-    completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    games_reviewed = Column(JSON, default=list)  # List of game IDs reviewed in this session
+    engine_analysis_count = Column(Integer, nullable=False)  # Number of positions analyzed
+    completed_at = Column(DateTime, nullable=True)  # When study session was completed
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     study_plan = relationship("StudyPlan", back_populates="study_sessions")
