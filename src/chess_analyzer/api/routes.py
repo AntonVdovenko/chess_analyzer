@@ -22,6 +22,13 @@ from src.chess_analyzer.api.schemas import (
     AnomalyResponse,
     SimilarPositionResponse,
     PatternDetailResponse,
+    StudyPlanGenerateRequest,
+    StudyPlanGenerateResponse,
+    MarkStudiedRequest,
+    MarkStudiedResponse,
+    ConceptListResponse,
+    StudyProgressResponse,
+    StudyGameDetailResponse,
 )
 from src.chess_analyzer.game_fetcher import ChessComFetcher
 from src.chess_analyzer.database.models import (
@@ -33,9 +40,13 @@ from src.chess_analyzer.database.models import (
     Anomaly,
     Embedding,
     AdvancedAnalysisJob,
+    StudyPlan,
+    ConceptMap,
+    StudySession,
 )
 from src.chess_analyzer.database.session import get_db
 from src.chess_analyzer.advanced_analysis_pipeline import AdvancedAnalysisPipeline
+from src.chess_analyzer.study_planning.study_plan_generator import StudyPlanGenerator
 
 router = APIRouter()
 
@@ -247,63 +258,6 @@ def get_patterns(
         )
         for pattern in patterns
     ]
-
-
-@router.get("/study-plan", response_model=StudyPlanResponse)
-def get_study_plan(username: str, db: Session = Depends(get_db)):
-    """Get a personalized study plan based on identified weaknesses.
-
-    Args:
-        username: Chess.com username
-        db: Database session dependency
-
-    Returns:
-        StudyPlanResponse with recommended games and study areas
-
-    Raises:
-        HTTPException: If user has no games
-    """
-    games = db.query(Game).filter(Game.username == username).all()
-
-    if not games:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No games found for player {username}",
-        )
-
-    patterns = (
-        db.query(Pattern)
-        .filter(Pattern.player_username == username)
-        .order_by(Pattern.frequency.desc())
-        .limit(5)
-        .all()
-    )
-
-    # Determine games with most losses (focus on improvement)
-    games_to_review = [
-        {
-            "game_id": g.id,
-            "opponent": g.opponent_username,
-            "result": g.result,
-            "date": g.date.isoformat() if g.date else None,
-        }
-        for g in sorted(games, key=lambda g: g.date, reverse=True)[:5]
-    ]
-
-    weak_points = [
-        {
-            "pattern": p.pattern_name,
-            "type": p.weakness_type,
-            "frequency": p.frequency,
-            "avg_loss": p.average_eval_loss,
-        }
-        for p in patterns
-    ]
-
-    return StudyPlanResponse(
-        games_to_review=games_to_review,
-        weak_points=weak_points,
-    )
 
 
 # Phase 2 Advanced Analysis Endpoints
@@ -548,3 +502,348 @@ async def get_pattern_details(pattern_id: int, db: Session = Depends(get_db)):
         similar_patterns=[],
         study_priority=study_priority,
     )
+
+
+# Phase 3 Study Plan API Endpoints
+
+
+@router.post("/study-plan/generate", response_model=StudyPlanGenerateResponse)
+def generate_study_plan(
+    request: StudyPlanGenerateRequest, db: Session = Depends(get_db)
+):
+    """Generate a personalized study plan for a player.
+
+    Creates study plans from weakness patterns with frequency-based prioritization.
+
+    Args:
+        request: StudyPlanGenerateRequest with username and optional game_limit
+        db: Database session dependency
+
+    Returns:
+        StudyPlanGenerateResponse with summary of created plans and distribution
+
+    Raises:
+        HTTPException: If generation fails
+    """
+    try:
+        generator = StudyPlanGenerator(db)
+        result = generator.generate_study_plan(request.username, request.game_limit)
+
+        return StudyPlanGenerateResponse(
+            username=result["username"],
+            total_weaknesses=result["total_weaknesses"],
+            study_plans_created=result["study_plans_created"],
+            priority_distribution=result["priority_distribution"],
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate study plan: {str(e)}",
+        ) from e
+
+
+@router.get("/study-plan", response_model=List[StudyPlanResponse])
+def list_study_plans(
+    user_id: str,
+    status: Optional[str] = None,
+    concept_type: Optional[str] = None,
+    sort_by: Optional[str] = "created_at",
+    db: Session = Depends(get_db),
+):
+    """List study plans for a user with optional filtering and sorting.
+
+    Args:
+        user_id: User identifier
+        status: Filter by status (active, completed, paused)
+        concept_type: Filter by concept type
+        sort_by: Sort field (priority_score, created_at, etc.)
+        db: Database session dependency
+
+    Returns:
+        List of StudyPlanResponse objects
+
+    Raises:
+        HTTPException: If query fails
+    """
+    try:
+        query = db.query(StudyPlan).filter(StudyPlan.user_id == user_id)
+
+        if status:
+            query = query.filter(StudyPlan.status == status)
+
+        # Handle sorting
+        if sort_by == "priority_score":
+            query = query.order_by(StudyPlan.priority_score.desc())
+        else:
+            query = query.order_by(StudyPlan.created_at.desc())
+
+        plans = query.all()
+
+        result = []
+        for plan in plans:
+            # Get concept count
+            concept_count = (
+                db.query(ConceptMap)
+                .filter(ConceptMap.weakness_id == plan.weakness_id)
+                .count()
+            )
+
+            result.append(
+                StudyPlanResponse(
+                    id=str(plan.id),
+                    user_id=plan.user_id,
+                    weakness_id=plan.weakness_id,
+                    priority_score=plan.priority_score,
+                    status=plan.status,
+                    concept_count=concept_count,
+                    created_at=plan.created_at,
+                )
+            )
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list study plans: {str(e)}",
+        ) from e
+
+
+@router.patch("/study-plan/{study_plan_id}/mark-studied", response_model=MarkStudiedResponse)
+def mark_study_plan_studied(
+    study_plan_id: str, request: MarkStudiedRequest, db: Session = Depends(get_db)
+):
+    """Mark a study plan as studied.
+
+    Updates plan status to completed and sets marked_studied_at timestamp.
+
+    Args:
+        study_plan_id: UUID of the study plan
+        request: MarkStudiedRequest (empty body)
+        db: Database session dependency
+
+    Returns:
+        MarkStudiedResponse with updated plan details
+
+    Raises:
+        HTTPException: If plan not found or update fails
+    """
+    try:
+        # Convert string ID to UUID
+        try:
+            plan_uuid = uuid.UUID(study_plan_id)
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="Invalid study plan ID format")
+
+        plan = db.query(StudyPlan).filter(StudyPlan.id == plan_uuid).first()
+
+        if not plan:
+            raise HTTPException(status_code=404, detail="Study plan not found")
+
+        now = datetime.now(timezone.utc)
+        plan.status = "completed"
+        plan.marked_studied_at = now
+        plan.updated_at = now
+
+        db.commit()
+        db.refresh(plan)
+
+        return MarkStudiedResponse(
+            id=str(plan.id),
+            status=plan.status,
+            marked_studied_at=plan.marked_studied_at,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to mark study plan as studied: {str(e)}",
+        ) from e
+
+
+@router.get("/study-plan/progress", response_model=StudyProgressResponse)
+def get_study_progress(user_id: str, db: Session = Depends(get_db)):
+    """Get study progress for a user.
+
+    Returns completion metrics and progress on study plans.
+
+    Args:
+        user_id: User identifier
+        db: Database session dependency
+
+    Returns:
+        StudyProgressResponse with progress metrics
+
+    Raises:
+        HTTPException: If query fails
+    """
+    try:
+        total_plans = db.query(StudyPlan).filter(StudyPlan.user_id == user_id).count()
+
+        active_plans = (
+            db.query(StudyPlan)
+            .filter(StudyPlan.user_id == user_id, StudyPlan.status == "active")
+            .count()
+        )
+
+        completed_plans = (
+            db.query(StudyPlan)
+            .filter(StudyPlan.user_id == user_id, StudyPlan.status == "completed")
+            .count()
+        )
+
+        completion_rate = (
+            (completed_plans / total_plans * 100) if total_plans > 0 else 0.0
+        )
+
+        return StudyProgressResponse(
+            user_id=user_id,
+            total_plans=total_plans,
+            active_plans=active_plans,
+            completed_plans=completed_plans,
+            completion_rate=completion_rate,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get study progress: {str(e)}",
+        ) from e
+
+
+@router.get("/study-plan/{study_plan_id}/concepts", response_model=ConceptListResponse)
+def get_study_plan_concepts(
+    study_plan_id: str, db: Session = Depends(get_db)
+):
+    """Get learning concepts for a study plan.
+
+    Returns concepts mapped to the weakness pattern.
+
+    Args:
+        study_plan_id: UUID of the study plan
+        db: Database session dependency
+
+    Returns:
+        ConceptListResponse with list of concepts
+
+    Raises:
+        HTTPException: If plan not found or query fails
+    """
+    try:
+        # Convert string ID to UUID
+        try:
+            plan_uuid = uuid.UUID(study_plan_id)
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="Invalid study plan ID format")
+
+        plan = db.query(StudyPlan).filter(StudyPlan.id == plan_uuid).first()
+
+        if not plan:
+            raise HTTPException(status_code=404, detail="Study plan not found")
+
+        concept_maps = (
+            db.query(ConceptMap)
+            .filter(ConceptMap.weakness_id == plan.weakness_id)
+            .all()
+        )
+
+        concepts = [
+            {"type": cm.concept_type, "name": cm.concept_name} for cm in concept_maps
+        ]
+
+        return ConceptListResponse(concepts=concepts)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get study plan concepts: {str(e)}",
+        ) from e
+
+
+@router.get("/study-plan/{study_plan_id}/games", response_model=List[StudyGameDetailResponse])
+def get_study_plan_games(
+    study_plan_id: str, db: Session = Depends(get_db)
+):
+    """Get games associated with a study plan's weakness pattern.
+
+    Returns game details for games that contain the weakness.
+
+    Args:
+        study_plan_id: UUID of the study plan
+        db: Database session dependency
+
+    Returns:
+        List of StudyGameDetailResponse objects
+
+    Raises:
+        HTTPException: If plan not found or query fails
+    """
+    try:
+        # Convert string ID to UUID
+        try:
+            plan_uuid = uuid.UUID(study_plan_id)
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="Invalid study plan ID format")
+
+        plan = db.query(StudyPlan).filter(StudyPlan.id == plan_uuid).first()
+
+        if not plan:
+            raise HTTPException(status_code=404, detail="Study plan not found")
+
+        # Get pattern details
+        pattern = db.query(Pattern).filter(Pattern.id == plan.weakness_id).first()
+
+        if not pattern:
+            return []
+
+        # Get game IDs from pattern
+        game_ids = pattern.game_ids if pattern.game_ids else []
+
+        if not game_ids:
+            return []
+
+        # Fetch games
+        games = db.query(Game).filter(Game.id.in_(game_ids)).all()
+
+        result = []
+        for game in games:
+            # Get positions for this game
+            positions = db.query(Position).filter(Position.game_id == game.id).all()
+
+            # Calculate accuracy
+            eval_losses = [p.evaluation_loss for p in positions if p.evaluation_loss]
+            avg_eval_loss = (
+                sum(eval_losses) / len(eval_losses) if eval_losses else 0.0
+            )
+            accuracy = max(0, 100 - (avg_eval_loss / 50))  # Rough approximation
+
+            # Get best move position FEN
+            position_fen = (
+                positions[0].fen if positions else "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            )
+
+            result.append(
+                StudyGameDetailResponse(
+                    game_id=game.id,
+                    study_plan_id=str(plan.id),
+                    weakness_id=plan.weakness_id,
+                    result=game.result,
+                    accuracy=accuracy,
+                    eval_loss=avg_eval_loss,
+                    position_fen=position_fen,
+                )
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get study plan games: {str(e)}",
+        ) from e
