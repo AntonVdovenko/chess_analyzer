@@ -1,6 +1,9 @@
 """Concept mapper for mapping chess weaknesses to learning concepts."""
 
-from typing import List, Dict
+import logging
+from typing import Any, List, Dict
+
+logger = logging.getLogger(__name__)
 
 
 class ConceptMapper:
@@ -67,27 +70,61 @@ class ConceptMapper:
             "pawn_endgame": {"description": "Pawn-only endgame"}
         }
 
-    def map_weakness(self, pattern) -> List[Dict]:
+    def map_weakness(self, pattern: Any) -> List[Dict]:
         """
-        Map a pattern to chess concepts.
+        Map a chess weakness pattern to relevant learning concepts.
+
+        Maps a pattern object to theory concepts, opening concepts, and position type
+        concepts based on the pattern's attributes. Validates required attributes and
+        gracefully handles missing data.
+
+        Expected Pattern Interface:
+            - type (str, required): Pattern type - "tactical", "positional", or "opening"
+            - opening (str, optional): Opening name (e.g., "sicilian_defense")
+            - avg_cpl (float, optional): Average centipawn loss (0-300+)
+            - endgame_type (str, optional): Specific endgame type (e.g., "rook_endgame")
+
+        Heuristic for Phase Detection:
+            Uses endgame_type first (most reliable indicator). Falls back to avg_cpl:
+            - avg_cpl < 150: Simpler position (endgame)
+            - avg_cpl >= 150: Complex position (middlegame)
+            Lower CPL indicates player made fewer significant errors = simpler position.
 
         Args:
-            pattern: Pattern object with type, opening, features
+            pattern (Any): Pattern object with optional attributes listed above
 
         Returns:
-            List of concept dicts: [{"type": "theory|opening|position_type", "name": "..."}]
+            List[Dict]: Concept dicts with structure:
+                [{"type": "theory|opening|position_type", "name": "concept_name"}]
+                Duplicates removed, order preserved.
+
+        Example:
+            >>> mapper = ConceptMapper()
+            >>> pattern = Mock(type="tactical", opening="sicilian_defense", avg_cpl=250)
+            >>> concepts = mapper.map_weakness(pattern)
+            >>> # Returns: [
+            >>> #   {"type": "theory", "name": "tactics"},
+            >>> #   {"type": "opening", "name": "sicilian_defense"},
+            >>> #   {"type": "position_type", "name": "middlegame"}
+            >>> # ]
         """
         concepts = []
 
+        # Validate pattern has required attributes
+        if not hasattr(pattern, 'type'):
+            logger.warning("Pattern missing required 'type' attribute")
+            return []
+
         # 1. Map theory concepts based on pattern type
-        if hasattr(pattern, 'type'):
-            if pattern.type == "tactical":
-                concepts.append({"type": "theory", "name": "tactics"})
-            elif pattern.type == "positional":
-                concepts.append({"type": "theory", "name": "strategy"})
-                concepts.append({"type": "theory", "name": "pawn_structure"})
-            elif pattern.type == "opening":
-                concepts.append({"type": "theory", "name": "tempo"})
+        if pattern.type == "tactical":
+            concepts.append({"type": "theory", "name": "tactics"})
+        elif pattern.type == "positional":
+            concepts.append({"type": "theory", "name": "strategy"})
+            concepts.append({"type": "theory", "name": "pawn_structure"})
+        elif pattern.type == "opening":
+            concepts.append({"type": "theory", "name": "tempo"})
+        else:
+            logger.warning(f"Unknown pattern type: {pattern.type}")
 
         # 2. Map opening concepts
         if hasattr(pattern, 'opening') and pattern.opening:
@@ -95,21 +132,36 @@ class ConceptMapper:
             if opening_name in self.opening_concepts:
                 concepts.append({"type": "opening", "name": opening_name})
             else:
+                logger.warning(f"Unknown opening encountered: {opening_name}")
                 concepts.append({"type": "opening", "name": "other"})
+        else:
+            if hasattr(pattern, 'opening'):
+                logger.warning("Pattern has 'opening' attribute but it is None or empty")
 
-        # 3. Map position type concepts
-        if hasattr(pattern, 'avg_cpl'):
-            # Use CPL as indicator of endgame (high CPL = important phase)
-            if pattern.avg_cpl > 200:
-                concepts.append({"type": "position_type", "name": "middlegame"})
-            else:
-                concepts.append({"type": "position_type", "name": "endgame"})
-
-        # Check for specific endgame types
+        # 3. Map position type concepts based on endgame_type first (most reliable)
+        # Then use CPL heuristic as fallback
+        endgame_mapped = False
         if hasattr(pattern, 'endgame_type') and pattern.endgame_type:
             endgame_name = pattern.endgame_type.lower().replace(" ", "_")
             if endgame_name in self.position_concepts:
                 concepts.append({"type": "position_type", "name": endgame_name})
+                endgame_mapped = True
+            else:
+                logger.warning(f"Unknown endgame_type: {pattern.endgame_type}")
+
+        # Use CPL as fallback if no specific endgame type was found
+        if not endgame_mapped and hasattr(pattern, 'avg_cpl'):
+            if pattern.avg_cpl is not None:
+                # Heuristic: avg_cpl < 150 indicates simpler position (endgame)
+                # Lower CPL = fewer significant errors = simpler position
+                if pattern.avg_cpl < 150:
+                    concepts.append({"type": "position_type", "name": "endgame"})
+                else:
+                    concepts.append({"type": "position_type", "name": "middlegame"})
+            else:
+                logger.warning("Pattern has 'avg_cpl' attribute but it is None")
+        elif not endgame_mapped:
+            logger.warning("Pattern missing 'avg_cpl' attribute for position type detection")
 
         # Remove duplicates while preserving order
         seen = set()
