@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { chessAPI } from '../api';
 import PatternFilter from './PatternFilter';
 import PatternList from './PatternList';

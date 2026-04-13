@@ -1,11 +1,11 @@
 import React from 'react';
-import Dashboard from './components/Dashboard';
+import PatternExplorer from './components/PatternExplorer';
 import './App.css';
 
 function App() {
   return (
     <div className="App">
-      <Dashboard />
+      <PatternExplorer />
     </div>
   );
 }
