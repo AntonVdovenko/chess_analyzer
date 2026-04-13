@@ -79,4 +79,58 @@ export const chessAPI = {
     if (!response.ok) throw new Error(`Failed to get pattern details: ${response.statusText}`);
     return response.json();
   },
+
+  // Phase 3 Study Plan API methods
+  startStudyPlanGeneration: async (username, gameLimit = 100) => {
+    const response = await fetch(`${BASE_URL}/study-plan/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, game_limit: gameLimit }),
+    });
+    if (!response.ok) throw new Error(`Failed to start study plan generation: ${response.statusText}`);
+    return response.json();
+  },
+
+  getStudyPlans: async (username, filters = {}) => {
+    const params = new URLSearchParams({ user_id: username });
+    if (filters.status) params.append('status', filters.status);
+    if (filters.concept_type) params.append('concept_type', filters.concept_type);
+    if (filters.sort_by) params.append('sort_by', filters.sort_by);
+
+    const response = await fetch(`${BASE_URL}/study-plan?${params}`);
+    if (!response.ok) throw new Error(`Failed to get study plans: ${response.statusText}`);
+    return response.json();
+  },
+
+  markWeaknessStudied: async (planId, gamesReviewed = 0, engineAnalysisCount = 0) => {
+    const response = await fetch(`${BASE_URL}/study-plan/${planId}/mark-studied`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        games_reviewed: gamesReviewed,
+        engine_analysis_count: engineAnalysisCount,
+      }),
+    });
+    if (!response.ok) throw new Error(`Failed to mark weakness as studied: ${response.statusText}`);
+    return response.json();
+  },
+
+  getStudyProgress: async (username) => {
+    const params = new URLSearchParams({ user_id: username });
+    const response = await fetch(`${BASE_URL}/study-plan/progress?${params}`);
+    if (!response.ok) throw new Error(`Failed to get study progress: ${response.statusText}`);
+    return response.json();
+  },
+
+  getStudyConcepts: async (planId, search = null) => {
+    const response = await fetch(`${BASE_URL}/study-plan/${planId}/concepts`);
+    if (!response.ok) throw new Error(`Failed to get study concepts: ${response.statusText}`);
+    return response.json();
+  },
+
+  getGamesForStudy: async (planId, includeAnalysis = true) => {
+    const response = await fetch(`${BASE_URL}/study-plan/${planId}/games`);
+    if (!response.ok) throw new Error(`Failed to get games for study: ${response.statusText}`);
+    return response.json();
+  },
 };
