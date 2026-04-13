@@ -19,30 +19,37 @@ def test_move_predictor_fit_empty_games():
 
 def test_move_predictor_fit_with_games():
     """Test fit learns move patterns correctly"""
-    # Create mock game with positions
-    position1 = Mock()
-    position1.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-    position1.player_move = "e2e4"
+    # Create mock game with positions (need at least 5 to meet min_position_frequency)
+    positions = []
+    fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
-    position2 = Mock()
-    position2.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-    position2.player_move = "d2d4"
+    # Add 3 e2e4 moves and 2 d2d4 moves
+    for _ in range(3):
+        pos = Mock()
+        pos.fen = fen
+        pos.player_move = "e2e4"
+        positions.append(pos)
+
+    for _ in range(2):
+        pos = Mock()
+        pos.fen = fen
+        pos.player_move = "d2d4"
+        positions.append(pos)
 
     game = Mock()
-    game.positions = [position1, position2]
+    game.positions = positions
 
     predictor = MovePredictor()
     predictor.fit([game])
 
-    # Should have learned the position
-    fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    # Should have learned the position (total 5 moves >= min_position_frequency)
     assert fen in predictor.move_distributions
-    assert predictor.move_distributions[fen]["e2e4"] == 1
-    assert predictor.move_distributions[fen]["d2d4"] == 1
+    assert predictor.move_distributions[fen]["e2e4"] == 3
+    assert predictor.move_distributions[fen]["d2d4"] == 2
 
     # Test prediction
-    assert predictor.predict(fen, "e2e4") == 0.5
-    assert predictor.predict(fen, "d2d4") == 0.5
+    assert predictor.predict(fen, "e2e4") == 0.6
+    assert predictor.predict(fen, "d2d4") == 0.4
     assert predictor.predict(fen, "a2a3") == 0.0
 
 
