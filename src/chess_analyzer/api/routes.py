@@ -1,10 +1,12 @@
 """API routes for Chess Analyzer."""
 
-from datetime import datetime
-from typing import List
+from datetime import datetime, timezone
+from typing import List, Optional
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+import numpy as np
 
 from src.chess_analyzer.api.schemas import (
     AnalyzeRequest,
@@ -13,10 +15,27 @@ from src.chess_analyzer.api.schemas import (
     PatternResponse,
     StatsResponse,
     StudyPlanResponse,
+    AdvancedAnalysisRequest,
+    AdvancedAnalysisResponse,
+    AdvancedAnalysisStatusResponse,
+    MovePredictionResponse,
+    AnomalyResponse,
+    SimilarPositionResponse,
+    PatternDetailResponse,
 )
 from src.chess_analyzer.game_fetcher import ChessComFetcher
-from src.chess_analyzer.database.models import Game, Pattern, Stats
+from src.chess_analyzer.database.models import (
+    Game,
+    Pattern,
+    Stats,
+    Position,
+    MovePrediction,
+    Anomaly,
+    Embedding,
+    AdvancedAnalysisJob,
+)
 from src.chess_analyzer.database.session import get_db
+from src.chess_analyzer.advanced_analysis_pipeline import AdvancedAnalysisPipeline
 
 router = APIRouter()
 
@@ -284,4 +303,248 @@ def get_study_plan(username: str, db: Session = Depends(get_db)):
     return StudyPlanResponse(
         games_to_review=games_to_review,
         weak_points=weak_points,
+    )
+
+
+# Phase 2 Advanced Analysis Endpoints
+
+
+@router.post("/advanced-analysis", response_model=AdvancedAnalysisResponse)
+async def start_advanced_analysis(
+    request: AdvancedAnalysisRequest, db: Session = Depends(get_db)
+):
+    """Start advanced analysis for a player.
+
+    Args:
+        request: AdvancedAnalysisRequest containing username and game_limit
+        db: Database session dependency
+
+    Returns:
+        AdvancedAnalysisResponse with job_id and status
+    """
+    job_id = str(uuid.uuid4())
+    job = AdvancedAnalysisJob(username=request.username, job_id=job_id, status="processing")
+    db.add(job)
+    db.commit()
+
+    try:
+        pipeline = AdvancedAnalysisPipeline(db)
+        pipeline.analyze_player(request.username)
+        job.status = "completed"
+        job.move_predictor_done = True
+        job.anomaly_detector_done = True
+        job.embedder_done = True
+        job.completed_at = datetime.now(timezone.utc)
+        db.commit()
+    except Exception as e:
+        job.status = "failed"
+        db.commit()
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return AdvancedAnalysisResponse(job_id=job_id, status="processing", username=request.username)
+
+
+@router.get("/advanced-analysis/{job_id}", response_model=AdvancedAnalysisStatusResponse)
+async def get_advanced_analysis_status(job_id: str, db: Session = Depends(get_db)):
+    """Check advanced analysis job status.
+
+    Args:
+        job_id: The job ID to check
+        db: Database session dependency
+
+    Returns:
+        AdvancedAnalysisStatusResponse with job status and progress
+
+    Raises:
+        HTTPException: If job not found
+    """
+    job = db.query(AdvancedAnalysisJob).filter(AdvancedAnalysisJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Get counts for this user
+    user_games = db.query(Game).filter(Game.username == job.username).all()
+    game_ids = [g.id for g in user_games]
+
+    unusual_moves = db.query(MovePrediction).filter(
+        MovePrediction.game_id.in_(game_ids)
+    ).count() if game_ids else 0
+
+    anomalies = db.query(Anomaly).filter(
+        Anomaly.game_id.in_(game_ids)
+    ).count() if game_ids else 0
+
+    embeddings = db.query(Embedding).count()
+
+    return AdvancedAnalysisStatusResponse(
+        job_id=job_id,
+        status=job.status,
+        username=job.username,
+        move_predictor_done=job.move_predictor_done,
+        anomaly_detector_done=job.anomaly_detector_done,
+        embedder_done=job.embedder_done,
+        unusual_moves_count=unusual_moves,
+        anomalies_count=anomalies,
+        embeddings_count=embeddings,
+    )
+
+
+@router.get("/move-predictions", response_model=List[MovePredictionResponse])
+async def get_move_predictions(
+    username: Optional[str] = None,
+    game_id: Optional[int] = None,
+    min_probability: float = 0.0,
+    db: Session = Depends(get_db),
+):
+    """Get unusual move predictions.
+
+    Args:
+        username: Optional filter by username
+        game_id: Optional filter by game ID
+        min_probability: Minimum probability score (0-1)
+        db: Database session dependency
+
+    Returns:
+        List of MovePredictionResponse objects
+    """
+    query = db.query(MovePrediction)
+
+    if username:
+        query = query.join(Game).filter(Game.username == username)
+
+    if game_id:
+        query = query.filter(MovePrediction.game_id == game_id)
+
+    predictions = query.filter(MovePrediction.probability_score >= min_probability).all()
+    return predictions
+
+
+@router.get("/anomalies", response_model=List[AnomalyResponse])
+async def get_anomalies(
+    username: Optional[str] = None,
+    game_id: Optional[int] = None,
+    min_score: float = 0.0,
+    db: Session = Depends(get_db),
+):
+    """Get detected anomalies (rare mistakes).
+
+    Args:
+        username: Optional filter by username
+        game_id: Optional filter by game ID
+        min_score: Minimum anomaly score (0-1)
+        db: Database session dependency
+
+    Returns:
+        List of AnomalyResponse objects sorted by anomaly score
+    """
+    query = db.query(Anomaly)
+
+    if username:
+        query = query.join(Game).filter(Game.username == username)
+
+    if game_id:
+        query = query.filter(Anomaly.game_id == game_id)
+
+    anomalies = query.filter(Anomaly.anomaly_score >= min_score).order_by(
+        Anomaly.anomaly_score.desc()
+    ).all()
+    return anomalies
+
+
+@router.get("/similar-positions", response_model=List[SimilarPositionResponse])
+async def get_similar_positions(
+    position_fen: str, limit: int = 10, db: Session = Depends(get_db)
+):
+    """Find semantically similar positions.
+
+    Args:
+        position_fen: FEN string of the reference position
+        limit: Maximum number of similar positions to return
+        db: Database session dependency
+
+    Returns:
+        List of SimilarPositionResponse objects
+
+    Raises:
+        HTTPException: If position or embedding not found
+    """
+    input_pos = db.query(Position).filter(Position.fen == position_fen).first()
+    if not input_pos:
+        raise HTTPException(status_code=404, detail="Position not found")
+
+    input_embedding = db.query(Embedding).filter(Embedding.position_id == input_pos.id).first()
+    if not input_embedding:
+        raise HTTPException(status_code=404, detail="Embedding not found")
+
+    all_embeddings = db.query(Embedding).all()
+    if not all_embeddings:
+        return []
+
+    pipeline = AdvancedAnalysisPipeline(db)
+    all_vectors = np.array([e.embedding_vector for e in all_embeddings])
+
+    similar_indices = pipeline.embedder.find_similar(
+        np.array(input_embedding.embedding_vector), all_vectors, k=min(limit, len(all_embeddings))
+    )
+
+    results = []
+    for idx in similar_indices:
+        emb = all_embeddings[idx]
+        pos = emb.position
+        similarity = pipeline.embedder.get_similarity_score(
+            np.array(input_embedding.embedding_vector), np.array(emb.embedding_vector)
+        )
+        results.append(
+            SimilarPositionResponse(
+                position_id=pos.id,
+                similarity_score=float(similarity),
+                game_id=pos.game_id,
+                centipawn_loss=float(pos.evaluation_loss or 0.0),
+                position_fen=pos.fen,
+            )
+        )
+
+    return results
+
+
+@router.get("/pattern-details/{pattern_id}", response_model=PatternDetailResponse)
+async def get_pattern_details(pattern_id: int, db: Session = Depends(get_db)):
+    """Get detailed pattern information with Phase 2 data.
+
+    Args:
+        pattern_id: The pattern ID to get details for
+        db: Database session dependency
+
+    Returns:
+        PatternDetailResponse with comprehensive pattern information
+
+    Raises:
+        HTTPException: If pattern not found
+    """
+    pattern = db.query(Pattern).filter(Pattern.id == pattern_id).first()
+    if not pattern:
+        raise HTTPException(status_code=404, detail="Pattern not found")
+
+    # Determine study priority based on frequency and average loss
+    frequency = pattern.frequency or 0
+    avg_loss = pattern.average_eval_loss or 0.0
+
+    if frequency > 10 and avg_loss > 200:
+        study_priority = "critical"
+    elif frequency > 5 or avg_loss > 150:
+        study_priority = "high"
+    else:
+        study_priority = "medium"
+
+    return PatternDetailResponse(
+        id=pattern.id,
+        name=pattern.pattern_name,
+        type=pattern.weakness_type,
+        frequency=frequency,
+        avg_loss=avg_loss,
+        affected_games=len(pattern.game_ids) if pattern.game_ids else 0,
+        unusual_moves_in_pattern=0,
+        anomaly_count=0,
+        similar_patterns=[],
+        study_priority=study_priority,
     )
