@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { chessAPI } from '../api';
 import StudyFilter from './StudyFilter';
 import StudyCard from './StudyCard';
@@ -20,15 +20,7 @@ export default function StudyPlan() {
   });
   const [showDetails, setShowDetails] = useState(false);
 
-  // Load study plans whenever username or filters change
-  useEffect(() => {
-    if (username) {
-      loadStudyPlans(username);
-      loadStudyProgress(username);
-    }
-  }, [username, filters]);
-
-  const loadStudyPlans = async (user) => {
+  const loadStudyPlans = useCallback(async (user) => {
     setLoading(true);
     setError(null);
 
@@ -40,16 +32,31 @@ export default function StudyPlan() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
-  const loadStudyProgress = async (user) => {
+  const loadStudyProgress = useCallback(async (user) => {
     try {
       const progressData = await chessAPI.getStudyProgress(user);
       setProgress(progressData);
     } catch (err) {
       console.error('Failed to load progress:', err.message);
     }
-  };
+  }, []);
+
+  // Load study plans and progress when username changes
+  useEffect(() => {
+    if (username) {
+      loadStudyPlans(username);
+      loadStudyProgress(username);
+    }
+  }, [username, loadStudyPlans, loadStudyProgress]);
+
+  // Reload study plans when filters change (progress doesn't change with filters)
+  useEffect(() => {
+    if (username) {
+      loadStudyPlans(username);
+    }
+  }, [username, loadStudyPlans]);
 
   const handleGeneratePlan = async (e) => {
     e.preventDefault();
@@ -86,7 +93,14 @@ export default function StudyPlan() {
     }
   };
 
-  const filteredPlans = applyFilters(studyPlans, filters);
+  // Memoize filtered plans to avoid unnecessary recalculations
+  const filteredPlans = useMemo(() => {
+    // Server already handles status and sort_by filtering, only filter by concept_type
+    if (!filters.concept_type || filters.concept_type === 'all') {
+      return studyPlans;
+    }
+    return studyPlans.filter((plan) => plan.concept_type === filters.concept_type);
+  }, [studyPlans, filters.concept_type]);
 
   return (
     <div className="study-plan-container">
@@ -199,26 +213,4 @@ export default function StudyPlan() {
       )}
     </div>
   );
-}
-
-function applyFilters(plans, filters) {
-  let filtered = plans;
-
-  if (filters.status && filters.status !== 'all') {
-    filtered = filtered.filter((p) => p.status === filters.status);
-  }
-
-  if (filters.concept_type && filters.concept_type !== 'all') {
-    filtered = filtered.filter((p) => p.concept_type === filters.concept_type);
-  }
-
-  // Sort
-  const sortField = filters.sort_by || 'created_at';
-  if (sortField === 'priority_score') {
-    filtered = filtered.sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
-  } else if (sortField === 'created_at') {
-    filtered = filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }
-
-  return filtered;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { chessAPI } from '../api';
 
 export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
@@ -7,11 +7,7 @@ export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadStudyDetail();
-  }, [plan]);
-
-  const loadStudyDetail = async () => {
+  const loadStudyDetail = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -28,7 +24,11 @@ export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [plan.id]);
+
+  useEffect(() => {
+    loadStudyDetail();
+  }, [loadStudyDetail]);
 
   const handleMarkStudied = async () => {
     try {
