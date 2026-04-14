@@ -190,7 +190,7 @@ class StudyPlanResponse(BaseModel):
     id: str = Field(..., description="UUID of the study plan")
     user_id: str = Field(..., description="User identifier")
     weakness_id: int = Field(..., description="Database ID of weakness pattern")
-    priority_score: float = Field(..., description="Priority score (0-10)", ge=0, le=10)
+    priority_score: float = Field(..., description="Priority score (0-1)", ge=0, le=1)
     status: str = Field(..., description="Plan status: active, completed, paused")
     concept_count: int = Field(..., description="Number of learning concepts", ge=0)
     created_at: datetime = Field(..., description="When plan was created")

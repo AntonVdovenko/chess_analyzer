@@ -50,9 +50,10 @@ from src.chess_analyzer.study_planning.study_plan_generator import StudyPlanGene
 
 router = APIRouter()
 
-# In-memory task tracking (in production, use a task queue like Celery)
+# NOTE: Phase 1 uses in-memory dict for task tracking (temporary, not scalable).
+# Phase 2+ uses database-backed job tracking (AdvancedAnalysisJob).
+# In production, implement a task queue (Celery with Redis) for all endpoints.
 analysis_tasks = {}
-task_counter = 0
 
 
 @router.get("/")
@@ -75,9 +76,7 @@ def analyze_games(request: AnalyzeRequest, db: Session = Depends(get_db)):
     Raises:
         HTTPException: If fetching games fails
     """
-    global task_counter
-    task_counter += 1
-    task_id = f"task_{task_counter}"
+    task_id = str(uuid.uuid4())
 
     try:
         # Fetch games from chess.com
@@ -579,15 +578,20 @@ def list_study_plans(
 
         plans = query.all()
 
+        # Batch query concepts instead of per-plan queries (prevents N+1 pattern)
+        weakness_ids = [plan.weakness_id for plan in plans]
+        concept_counts = {wid: 0 for wid in weakness_ids}
+        if weakness_ids:
+            concepts = (
+                db.query(ConceptMap)
+                .filter(ConceptMap.weakness_id.in_(weakness_ids))
+                .all()
+            )
+            for concept in concepts:
+                concept_counts[concept.weakness_id] = concept_counts.get(concept.weakness_id, 0) + 1
+
         result = []
         for plan in plans:
-            # Get concept count
-            concept_count = (
-                db.query(ConceptMap)
-                .filter(ConceptMap.weakness_id == plan.weakness_id)
-                .count()
-            )
-
             result.append(
                 StudyPlanResponse(
                     id=str(plan.id),
@@ -595,7 +599,7 @@ def list_study_plans(
                     weakness_id=plan.weakness_id,
                     priority_score=plan.priority_score,
                     status=plan.status,
-                    concept_count=concept_count,
+                    concept_count=concept_counts.get(plan.weakness_id, 0),
                     created_at=plan.created_at,
                 )
             )

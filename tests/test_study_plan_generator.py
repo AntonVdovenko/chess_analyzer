@@ -164,12 +164,12 @@ class TestCalculatePriorityScores:
         assert scores[0] > scores[1]
         assert scores[0] > scores[2]
 
-    def test_calculate_priority_scores_scale_to_10(self, sample_patterns):
-        """Test that max score is 10."""
+    def test_calculate_priority_scores_scale_to_1(self, sample_patterns):
+        """Test that max score is 1.0."""
         scores = StudyPlanGenerator._calculate_priority_scores(sample_patterns)
 
         max_score = max(scores)
-        assert max_score == 10
+        assert max_score == 1.0
 
     def test_calculate_priority_scores_empty_list(self):
         """Test handling empty patterns list."""
@@ -190,7 +190,7 @@ class TestCalculatePriorityScores:
         scores = StudyPlanGenerator._calculate_priority_scores([pattern])
 
         assert len(scores) == 1
-        assert scores[0] == 10  # Single pattern gets max score
+        assert scores[0] == 1.0  # Single pattern gets max score (normalized to 0-1)
 
 
 class TestCategorizeByPriority:
@@ -198,27 +198,27 @@ class TestCategorizeByPriority:
 
     def test_categorize_by_priority_high(self):
         """Test categorizing high priority scores."""
-        category = StudyPlanGenerator._categorize_by_priority(8.5)
+        category = StudyPlanGenerator._categorize_by_priority(0.85)
         assert category == "high"
 
     def test_categorize_by_priority_medium(self):
         """Test categorizing medium priority scores."""
-        category = StudyPlanGenerator._categorize_by_priority(5.0)
+        category = StudyPlanGenerator._categorize_by_priority(0.5)
         assert category == "medium"
 
     def test_categorize_by_priority_low(self):
         """Test categorizing low priority scores."""
-        category = StudyPlanGenerator._categorize_by_priority(2.0)
+        category = StudyPlanGenerator._categorize_by_priority(0.2)
         assert category == "low"
 
     def test_categorize_by_priority_boundary_high(self):
-        """Test boundary between high and medium (7.0)."""
-        category = StudyPlanGenerator._categorize_by_priority(7.0)
+        """Test boundary between high and medium (0.7)."""
+        category = StudyPlanGenerator._categorize_by_priority(0.7)
         assert category == "high"
 
     def test_categorize_by_priority_boundary_medium(self):
-        """Test boundary between medium and low (3.5)."""
-        category = StudyPlanGenerator._categorize_by_priority(3.5)
+        """Test boundary between medium and low (0.35)."""
+        category = StudyPlanGenerator._categorize_by_priority(0.35)
         assert category == "medium"
 
 

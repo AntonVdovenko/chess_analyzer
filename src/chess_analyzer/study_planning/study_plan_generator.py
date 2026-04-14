@@ -124,7 +124,6 @@ class StudyPlanGenerator:
                 status="active",
             )
             self.db_session.add(study_plan)
-            self.db_session.flush()  # Get the ID without committing
 
             # Map concepts for this pattern using adapter
             adapter = PatternAdapter(pattern)
@@ -141,7 +140,7 @@ class StudyPlanGenerator:
 
             study_plans_created += 1
 
-        # Commit all changes
+        # Batch commit all changes at once
         self.db_session.commit()
 
         return {
@@ -155,14 +154,14 @@ class StudyPlanGenerator:
     def _calculate_priority_scores(patterns: List[Pattern]) -> List[float]:
         """Calculate priority scores for patterns based on frequency.
 
-        Normalizes pattern frequencies to a 0-10 scale, with the highest
-        frequency pattern receiving a score of 10.
+        Normalizes pattern frequencies to a 0-1 scale, with the highest
+        frequency pattern receiving a score of 1.0.
 
         Args:
             patterns: List of Pattern objects
 
         Returns:
-            List of priority scores (0-10) corresponding to patterns
+            List of priority scores (0-1) corresponding to patterns
         """
         if not patterns:
             return []
@@ -175,8 +174,8 @@ class StudyPlanGenerator:
             # Handle edge case of all zero frequencies
             return [0.0] * len(patterns)
 
-        # Normalize to 0-10 scale
-        scores = [(freq / max_frequency) * 10 for freq in frequencies]
+        # Normalize to 0-1 scale
+        scores = [freq / max_frequency for freq in frequencies]
         return scores
 
     @staticmethod
@@ -184,14 +183,14 @@ class StudyPlanGenerator:
         """Categorize a priority score into high, medium, or low.
 
         Args:
-            score: Priority score (0-10)
+            score: Priority score (0-1)
 
         Returns:
             Category string: "high", "medium", or "low"
         """
-        if score >= 7.0:
+        if score >= 0.7:
             return "high"
-        elif score >= 3.5:
+        elif score >= 0.35:
             return "medium"
         else:
             return "low"

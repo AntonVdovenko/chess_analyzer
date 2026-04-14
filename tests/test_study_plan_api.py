@@ -182,13 +182,13 @@ def sample_study_plans(test_db, sample_patterns):
         StudyPlan(
             user_id="testplayer",
             weakness_id=sample_patterns[0].id,
-            priority_score=8.5,
+            priority_score=0.85,  # Normalized to 0-1 scale
             status="active",
         ),
         StudyPlan(
             user_id="testplayer",
             weakness_id=sample_patterns[1].id,
-            priority_score=5.0,
+            priority_score=0.5,  # Normalized to 0-1 scale
             status="active",
         ),
     ]

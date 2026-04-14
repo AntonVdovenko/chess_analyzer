@@ -85,7 +85,7 @@ class TestStudyPlanResponse:
             id=plan_id,
             user_id="user123",
             weakness_id=1,
-            priority_score=8.5,
+            priority_score=0.85,  # Normalized to 0-1 scale
             status="active",
             concept_count=3,
             created_at=datetime.now(),
@@ -93,7 +93,7 @@ class TestStudyPlanResponse:
         assert response.id == plan_id
         assert response.user_id == "user123"
         assert response.weakness_id == 1
-        assert response.priority_score == 8.5
+        assert response.priority_score == 0.85
         assert response.status == "active"
         assert response.concept_count == 3
 
@@ -105,7 +105,7 @@ class TestStudyPlanResponse:
                 id=plan_id,
                 user_id="user123",
                 weakness_id=1,
-                priority_score=5.0,
+                priority_score=0.5,  # Normalized to 0-1 scale
                 status=status,
                 concept_count=2,
                 created_at=datetime.now(),
@@ -119,12 +119,12 @@ class TestStudyPlanResponse:
             id=plan_id,
             user_id="user123",
             weakness_id=1,
-            priority_score=10.0,
+            priority_score=1.0,  # Normalized to 0-1 scale
             status="active",
             concept_count=1,
             created_at=datetime.now(),
         )
-        assert 0 <= response.priority_score <= 10
+        assert 0 <= response.priority_score <= 1
 
 
 class TestMarkStudiedRequest:
