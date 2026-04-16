@@ -52,7 +52,9 @@ router = APIRouter()
 
 # NOTE: Phase 1 uses in-memory dict for task tracking (temporary, not scalable).
 # Phase 2+ uses database-backed job tracking (AdvancedAnalysisJob).
+# TODO: Implement task cleanup with TTL or explicit removal after task completion.
 # In production, implement a task queue (Celery with Redis) for all endpoints.
+# This dict grows unbounded - entries are never cleaned up.
 analysis_tasks = {}
 
 

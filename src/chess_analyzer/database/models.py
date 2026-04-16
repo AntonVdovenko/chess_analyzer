@@ -172,7 +172,7 @@ class StudyPlan(Base):
     id = Column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(String(255), nullable=False, index=True)  # User identifier for access control
     weakness_id = Column(Integer, ForeignKey("patterns.id"), nullable=False)
-    priority_score = Column(Float, nullable=False, index=True)  # Score from 0-10 indicating urgency
+    priority_score = Column(Float, nullable=False, index=True)  # Score from 0-1 indicating urgency (normalized frequency)
     status = Column(String(50), nullable=False, index=True)  # "active", "completed", "paused"
     marked_studied_at = Column(DateTime, nullable=True)  # When user marked pattern as studied
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
