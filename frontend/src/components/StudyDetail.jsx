@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { chessAPI } from '../api';
+import { formatPercentage, formatNumber, formatDate } from '../utils';
 
 export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
   const [concepts, setConcepts] = useState([]);
@@ -72,7 +73,7 @@ export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
             </div>
             <div className="info-row">
               <span className="info-label">Priority Score</span>
-              <span className="info-value">{(plan.priority_score * 100).toFixed(0)}%</span>
+              <span className="info-value">{formatPercentage(plan.priority_score)}</span>
             </div>
             <div className="info-row">
               <span className="info-label">Status</span>
@@ -81,7 +82,7 @@ export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
             <div className="info-row">
               <span className="info-label">Created</span>
               <span className="info-value">
-                {new Date(plan.created_at).toLocaleDateString()}
+                {formatDate(plan.created_at)}
               </span>
             </div>
           </div>
@@ -117,11 +118,11 @@ export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
                   <div className="game-stats">
                     <div className="game-stat">
                       <span className="stat-label">Accuracy</span>
-                      <span className="stat-value">{game.accuracy.toFixed(1)}%</span>
+                      <span className="stat-value">{formatPercentage(game.accuracy, 1)}%</span>
                     </div>
                     <div className="game-stat">
                       <span className="stat-label">Eval Loss</span>
-                      <span className="stat-value">{game.eval_loss.toFixed(1)}</span>
+                      <span className="stat-value">{formatNumber(game.eval_loss, 1)}</span>
                     </div>
                   </div>
                   <div className="game-fen">

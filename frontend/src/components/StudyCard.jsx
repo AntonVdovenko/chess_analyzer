@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatPercentage, formatDate } from '../utils';
 
 export default function StudyCard({ plan, onExpand }) {
   const getPriorityColor = (priority) => {
@@ -51,13 +52,13 @@ export default function StudyCard({ plan, onExpand }) {
 
         <div className="study-card-stat">
           <span className="stat-label">Priority Score</span>
-          <span className="stat-value">{(priorityScore * 100).toFixed(0)}%</span>
+          <span className="stat-value">{formatPercentage(priorityScore)}</span>
         </div>
 
         <div className="study-card-stat">
           <span className="stat-label">Created</span>
           <span className="stat-value">
-            {new Date(plan.created_at).toLocaleDateString()}
+            {formatDate(plan.created_at)}
           </span>
         </div>
       </div>

@@ -5,24 +5,10 @@ export default function StudyFilter({ plans, filters, onFilterChange }) {
   const uniqueStatuses = ['all', ...new Set(plans.map((p) => p.status).filter(Boolean))];
   const uniqueConceptTypes = ['all', ...new Set(plans.map((p) => p.concept_type).filter(Boolean))];
 
-  const handleStatusChange = (e) => {
+  const handleFilterChange = (fieldName) => (e) => {
     onFilterChange({
       ...filters,
-      status: e.target.value,
-    });
-  };
-
-  const handleConceptTypeChange = (e) => {
-    onFilterChange({
-      ...filters,
-      concept_type: e.target.value,
-    });
-  };
-
-  const handleSortChange = (e) => {
-    onFilterChange({
-      ...filters,
-      sort_by: e.target.value,
+      [fieldName]: e.target.value,
     });
   };
 
@@ -35,7 +21,7 @@ export default function StudyFilter({ plans, filters, onFilterChange }) {
         <select
           id="status-filter"
           value={filters.status || 'all'}
-          onChange={handleStatusChange}
+          onChange={handleFilterChange('status')}
         >
           {uniqueStatuses.map((status) => (
             <option key={status} value={status}>
@@ -50,7 +36,7 @@ export default function StudyFilter({ plans, filters, onFilterChange }) {
         <select
           id="concept-filter"
           value={filters.concept_type || 'all'}
-          onChange={handleConceptTypeChange}
+          onChange={handleFilterChange('concept_type')}
         >
           {uniqueConceptTypes.map((type) => (
             <option key={type} value={type}>
@@ -65,7 +51,7 @@ export default function StudyFilter({ plans, filters, onFilterChange }) {
         <select
           id="sort-filter"
           value={filters.sort_by || 'created_at'}
-          onChange={handleSortChange}
+          onChange={handleFilterChange('sort_by')}
         >
           <option value="created_at">Date Created</option>
           <option value="priority_score">Priority</option>

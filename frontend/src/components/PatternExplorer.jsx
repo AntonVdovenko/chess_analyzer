@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { chessAPI } from '../api';
+import { formatPercentage } from '../utils';
 import PatternFilter from './PatternFilter';
 import PatternList from './PatternList';
 import PatternDetail from './PatternDetail';
@@ -19,6 +20,13 @@ export default function PatternExplorer() {
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const loadStatsAndPatterns = useCallback(async () => {
+    const statsData = await chessAPI.getStats(username);
+    setStats(statsData);
+    const patternsData = await chessAPI.getPatterns(username);
+    setPatterns(patternsData || []);
+  }, [username]);
+
   const handleLoadAnalysis = async (e) => {
     e.preventDefault();
     if (!username) return;
@@ -26,10 +34,7 @@ export default function PatternExplorer() {
     setError(null);
 
     try {
-      const statsData = await chessAPI.getStats(username);
-      setStats(statsData);
-      const patternsData = await chessAPI.getPatterns(username);
-      setPatterns(patternsData || []);
+      await loadStatsAndPatterns();
       setShowAdvanced(true);
     } catch (err) {
       setError(err.message);
@@ -53,10 +58,7 @@ export default function PatternExplorer() {
         const status = await chessAPI.getAdvancedAnalysisStatus(result.job_id);
         if (status.status === 'completed') {
           completed = true;
-          const statsData = await chessAPI.getStats(username);
-          setStats(statsData);
-          const patternsData = await chessAPI.getPatterns(username);
-          setPatterns(patternsData || []);
+          await loadStatsAndPatterns();
         }
         attempts++;
       }
@@ -123,7 +125,7 @@ export default function PatternExplorer() {
             <div className="stat-item">
               <span className="stat-label">Overall Accuracy</span>
               <span className="stat-value">
-                {stats.overall_accuracy ? stats.overall_accuracy.toFixed(1) : 'N/A'}%
+                {stats.overall_accuracy ? formatPercentage(stats.overall_accuracy, 1) : 'N/A'}
               </span>
             </div>
             {showAdvanced && (
