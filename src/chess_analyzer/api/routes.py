@@ -50,12 +50,40 @@ from src.chess_analyzer.study_planning.study_plan_generator import StudyPlanGene
 
 router = APIRouter()
 
+# Constants for priority scoring
+PRIORITY_CRITICAL_FREQUENCY = 10  # Frequency threshold for critical priority
+PRIORITY_CRITICAL_LOSS = 200  # Centipawn loss threshold for critical priority
+PRIORITY_HIGH_FREQUENCY = 5  # Frequency threshold for high priority
+PRIORITY_HIGH_LOSS = 150  # Centipawn loss threshold for high priority
+
 # NOTE: Phase 1 uses in-memory dict for task tracking (temporary, not scalable).
 # Phase 2+ uses database-backed job tracking (AdvancedAnalysisJob).
 # TODO: Implement task cleanup with TTL or explicit removal after task completion.
 # In production, implement a task queue (Celery with Redis) for all endpoints.
 # This dict grows unbounded - entries are never cleaned up.
 analysis_tasks = {}
+
+
+def validate_uuid_param(value: str, param_name: str = "ID") -> str:
+    """Validate and convert string to UUID, raising HTTPException if invalid.
+
+    Args:
+        value: String value to validate as UUID
+        param_name: Name of parameter for error message
+
+    Returns:
+        String representation of UUID
+
+    Raises:
+        HTTPException: 400 if value is not a valid UUID
+    """
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {param_name} format"
+        )
 
 
 @router.get("/")
@@ -484,9 +512,9 @@ async def get_pattern_details(pattern_id: int, db: Session = Depends(get_db)):
     frequency = pattern.frequency or 0
     avg_loss = pattern.average_eval_loss or 0.0
 
-    if frequency > 10 and avg_loss > 200:
+    if frequency > PRIORITY_CRITICAL_FREQUENCY and avg_loss > PRIORITY_CRITICAL_LOSS:
         study_priority = "critical"
-    elif frequency > 5 or avg_loss > 150:
+    elif frequency > PRIORITY_HIGH_FREQUENCY or avg_loss > PRIORITY_HIGH_LOSS:
         study_priority = "high"
     else:
         study_priority = "medium"
@@ -635,11 +663,8 @@ def mark_study_plan_studied(
         HTTPException: If plan not found or update fails
     """
     try:
-        # Convert string ID to UUID
-        try:
-            plan_uuid = uuid.UUID(study_plan_id)
-        except (ValueError, AttributeError):
-            raise HTTPException(status_code=400, detail="Invalid study plan ID format")
+        # Validate study plan ID format
+        plan_uuid = uuid.UUID(validate_uuid_param(study_plan_id, "study plan ID"))
 
         plan = db.query(StudyPlan).filter(StudyPlan.id == plan_uuid).first()
 
@@ -738,11 +763,8 @@ def get_study_plan_concepts(
         HTTPException: If plan not found or query fails
     """
     try:
-        # Convert string ID to UUID
-        try:
-            plan_uuid = uuid.UUID(study_plan_id)
-        except (ValueError, AttributeError):
-            raise HTTPException(status_code=400, detail="Invalid study plan ID format")
+        # Validate study plan ID format
+        plan_uuid = uuid.UUID(validate_uuid_param(study_plan_id, "study plan ID"))
 
         plan = db.query(StudyPlan).filter(StudyPlan.id == plan_uuid).first()
 
@@ -789,11 +811,8 @@ def get_study_plan_games(
         HTTPException: If plan not found or query fails
     """
     try:
-        # Convert string ID to UUID
-        try:
-            plan_uuid = uuid.UUID(study_plan_id)
-        except (ValueError, AttributeError):
-            raise HTTPException(status_code=400, detail="Invalid study plan ID format")
+        # Validate study plan ID format
+        plan_uuid = uuid.UUID(validate_uuid_param(study_plan_id, "study plan ID"))
 
         plan = db.query(StudyPlan).filter(StudyPlan.id == plan_uuid).first()
 
