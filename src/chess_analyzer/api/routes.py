@@ -1,89 +1,240 @@
 """API routes for Chess Analyzer."""
 
-from datetime import datetime, timezone
-from typing import List, Optional
-import uuid
+from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime
+from statistics import mean
+from typing import Annotated
+
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-import numpy as np
 
+from src.chess_analyzer.advanced_analysis_pipeline import AdvancedAnalysisPipeline
+from src.chess_analyzer.analysis_pipeline import AnalysisPipeline
 from src.chess_analyzer.api.schemas import (
-    AnalyzeRequest,
-    AnalysisStatus,
-    GameResponse,
-    PatternResponse,
-    StatsResponse,
-    StudyPlanResponse,
     AdvancedAnalysisRequest,
     AdvancedAnalysisResponse,
     AdvancedAnalysisStatusResponse,
-    MovePredictionResponse,
+    AnalysisStatus,
+    AnalyzeRequest,
     AnomalyResponse,
-    SimilarPositionResponse,
-    PatternDetailResponse,
-    StudyPlanGenerateRequest,
-    StudyPlanGenerateResponse,
+    ConceptListResponse,
+    GameResponse,
     MarkStudiedRequest,
     MarkStudiedResponse,
-    ConceptListResponse,
-    StudyProgressResponse,
+    MovePredictionResponse,
+    PatternDetailResponse,
+    PatternResponse,
+    SimilarPositionResponse,
+    StatsResponse,
     StudyGameDetailResponse,
+    StudyPlanGenerateRequest,
+    StudyPlanGenerateResponse,
+    StudyPlanResponse,
+    StudyProgressResponse,
 )
-from src.chess_analyzer.game_fetcher import ChessComFetcher
 from src.chess_analyzer.database.models import (
-    Game,
-    Pattern,
-    Stats,
-    Position,
-    MovePrediction,
-    Anomaly,
-    Embedding,
     AdvancedAnalysisJob,
-    StudyPlan,
+    Anomaly,
     ConceptMap,
+    Embedding,
+    Game,
+    MovePrediction,
+    Pattern,
+    Position,
+    Stats,
+    StudyPlan,
     StudySession,
 )
 from src.chess_analyzer.database.session import get_db
-from src.chess_analyzer.advanced_analysis_pipeline import AdvancedAnalysisPipeline
+from src.chess_analyzer.game_fetcher import ChessComFetcher
+from src.chess_analyzer.ml_models.embeddings import PositionEmbedder
 from src.chess_analyzer.study_planning.study_plan_generator import StudyPlanGenerator
 
 router = APIRouter()
 
-# Constants for priority scoring
-PRIORITY_CRITICAL_FREQUENCY = 10  # Frequency threshold for critical priority
-PRIORITY_CRITICAL_LOSS = 200  # Centipawn loss threshold for critical priority
-PRIORITY_HIGH_FREQUENCY = 5  # Frequency threshold for high priority
-PRIORITY_HIGH_LOSS = 150  # Centipawn loss threshold for high priority
+PRIORITY_CRITICAL_FREQUENCY = 10
+PRIORITY_CRITICAL_LOSS = 200
+PRIORITY_HIGH_FREQUENCY = 5
+PRIORITY_HIGH_LOSS = 150
 
-# NOTE: Phase 1 uses in-memory dict for task tracking (temporary, not scalable).
-# Phase 2+ uses database-backed job tracking (AdvancedAnalysisJob).
-# TODO: Implement task cleanup with TTL or explicit removal after task completion.
-# In production, implement a task queue (Celery with Redis) for all endpoints.
-# This dict grows unbounded - entries are never cleaned up.
-analysis_tasks = {}
+analysis_tasks: dict[str, dict[str, int | str]] = {}
+DbSession = Annotated[Session, Depends(get_db)]
 
 
 def validate_uuid_param(value: str, param_name: str = "ID") -> str:
-    """Validate and convert string to UUID, raising HTTPException if invalid.
-
-    Args:
-        value: String value to validate as UUID
-        param_name: Name of parameter for error message
-
-    Returns:
-        String representation of UUID
-
-    Raises:
-        HTTPException: 400 if value is not a valid UUID
-    """
+    """Validate and normalize a UUID string."""
     try:
         return str(uuid.UUID(value))
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError) as exc:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid {param_name} format"
+            detail=f"Invalid {param_name} format",
+        ) from exc
+
+
+def _estimate_accuracy_from_acpl(acpl: float) -> float:
+    """Estimate a player-friendly accuracy score from ACPL."""
+    return max(0.0, min(100.0, 100.0 - (acpl / 10.0)))
+
+
+def _estimate_move_accuracy(eval_loss: float) -> float:
+    """Convert a move's evaluation loss into a rough accuracy percentage."""
+    return max(0.0, min(100.0, 100.0 - (eval_loss / 10.0)))
+
+
+def _get_player_color(game_data: dict[str, object], username: str) -> str:
+    """Determine whether the analyzed player was white or black."""
+    white_player = str(game_data.get("white", "")).lower()
+    if white_player == username.lower():
+        return "white"
+    return "black"
+
+
+def _get_game_acpl(game: Game) -> float:
+    """Calculate ACPL from a game's persisted positions."""
+    eval_losses = [
+        position.evaluation_loss
+        for position in game.positions
+        if position.evaluation_loss is not None
+    ]
+    if not eval_losses:
+        return 0.0
+    return float(mean(eval_losses))
+
+
+def _build_accuracy_by_phase(positions: list[Position]) -> dict[str, float]:
+    """Aggregate accuracy percentages by game phase."""
+    phase_buckets: dict[str, list[float]] = {
+        "opening": [],
+        "middlegame": [],
+        "endgame": [],
+    }
+    for position in positions:
+        if position.evaluation_loss is None:
+            continue
+        if position.is_opening:
+            phase_buckets["opening"].append(_estimate_move_accuracy(position.evaluation_loss))
+        elif position.is_endgame:
+            phase_buckets["endgame"].append(_estimate_move_accuracy(position.evaluation_loss))
+        else:
+            phase_buckets["middlegame"].append(_estimate_move_accuracy(position.evaluation_loss))
+
+    return {
+        phase: float(mean(values))
+        for phase, values in phase_buckets.items()
+        if values
+    }
+
+
+def _build_weakness_summary(db: Session, username: str) -> list[dict[str, object]]:
+    """Build a stats-friendly weakness summary from persisted patterns."""
+    patterns = (
+        db.query(Pattern)
+        .filter(Pattern.player_username == username)
+        .order_by(Pattern.frequency.desc(), Pattern.average_eval_loss.desc())
+        .limit(5)
+        .all()
+    )
+    return [
+        {
+            "weakness": pattern.pattern_name,
+            "frequency": pattern.frequency,
+            "avg_loss": pattern.average_eval_loss,
+            "type": pattern.weakness_type,
+        }
+        for pattern in patterns
+    ]
+
+
+def _clear_player_analysis_data(db: Session, username: str) -> None:
+    """Delete existing analysis artifacts for a user before re-analysis."""
+    pattern_ids = [
+        pattern_id
+        for (pattern_id,) in db.query(Pattern.id)
+        .filter(Pattern.player_username == username)
+        .all()
+    ]
+    study_plan_ids = [
+        study_plan_id
+        for (study_plan_id,) in db.query(StudyPlan.id)
+        .filter(StudyPlan.user_id == username)
+        .all()
+    ]
+    game_ids = [
+        game_id
+        for (game_id,) in db.query(Game.id).filter(Game.username == username).all()
+    ]
+    position_ids: list[int] = []
+    if game_ids:
+        position_ids = [
+            position_id
+            for (position_id,) in db.query(Position.id)
+            .filter(Position.game_id.in_(game_ids))
+            .all()
+        ]
+
+    if study_plan_ids:
+        db.query(StudySession).filter(StudySession.study_plan_id.in_(study_plan_ids)).delete(
+            synchronize_session=False
         )
+    db.query(StudyPlan).filter(StudyPlan.user_id == username).delete(
+        synchronize_session=False
+    )
+
+    if pattern_ids:
+        db.query(ConceptMap).filter(ConceptMap.weakness_id.in_(pattern_ids)).delete(
+            synchronize_session=False
+        )
+    db.query(Pattern).filter(Pattern.player_username == username).delete(
+        synchronize_session=False
+    )
+    db.query(Stats).filter(Stats.player_username == username).delete(
+        synchronize_session=False
+    )
+
+    if game_ids:
+        db.query(MovePrediction).filter(MovePrediction.game_id.in_(game_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Anomaly).filter(Anomaly.game_id.in_(game_ids)).delete(
+            synchronize_session=False
+        )
+    if position_ids:
+        db.query(Embedding).filter(Embedding.position_id.in_(position_ids)).delete(
+            synchronize_session=False
+        )
+    if game_ids:
+        db.query(Position).filter(Position.game_id.in_(game_ids)).delete(
+            synchronize_session=False
+        )
+    db.query(Game).filter(Game.username == username).delete(synchronize_session=False)
+    db.flush()
+
+
+def _create_stats_record(
+    db: Session,
+    username: str,
+    games: list[Game],
+) -> Stats:
+    """Build a Stats row from persisted games and positions."""
+    all_positions = [position for game in games for position in game.positions]
+    game_accuracies = [_estimate_accuracy_from_acpl(_get_game_acpl(game)) for game in games]
+    wins = sum(game.result == "win" for game in games)
+    losses = sum(game.result == "loss" for game in games)
+    win_loss_ratio = float(wins) if losses == 0 else wins / losses
+
+    stats = Stats(
+        player_username=username,
+        total_games=len(games),
+        total_accuracy=float(mean(game_accuracies)) if game_accuracies else 0.0,
+        accuracy_by_phase=_build_accuracy_by_phase(all_positions),
+        win_loss_ratio=win_loss_ratio,
+    )
+    db.add(stats)
+    return stats
 
 
 @router.get("/")
@@ -93,28 +244,30 @@ async def root():
 
 
 @router.post("/analyze", response_model=AnalysisStatus)
-def analyze_games(request: AnalyzeRequest, db: Session = Depends(get_db)):
-    """Start analysis job for a player's chess.com games.
-
-    Args:
-        request: AnalyzeRequest containing username and optional game limit
-        db: Database session dependency
-
-    Returns:
-        AnalysisStatus with task_id to track progress
-
-    Raises:
-        HTTPException: If fetching games fails
-    """
+def analyze_games(request: AnalyzeRequest, db: DbSession):
+    """Fetch games, analyze them, and persist derived data."""
     task_id = str(uuid.uuid4())
 
     try:
-        # Fetch games from chess.com
         fetcher = ChessComFetcher()
-        games = fetcher.fetch_games(request.username, limit=request.limit)
+        fetched_games = fetcher.fetch_games(request.username, limit=request.limit)
+    except Exception as exc:
+        analysis_tasks[task_id] = {
+            "status": "failed",
+            "games_analyzed": 0,
+            "patterns_found": 0,
+        }
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to fetch games: {exc}",
+        ) from exc
 
-        # Store games in database
-        for game_data in games:
+    try:
+        _clear_player_analysis_data(db, request.username)
+
+        db_games: list[Game] = []
+        pipeline_input: list[dict[str, object]] = []
+        for game_data in fetched_games:
             db_game = Game(
                 username=request.username,
                 opponent_username=game_data.get("opponent"),
@@ -127,73 +280,106 @@ def analyze_games(request: AnalyzeRequest, db: Session = Depends(get_db)):
                 black_elo=game_data.get("black_elo"),
             )
             db.add(db_game)
+            db.flush()
+            db_games.append(db_game)
+            pipeline_input.append(
+                {
+                    "game_id": db_game.id,
+                    "pgn": db_game.pgn,
+                    "player_color": _get_player_color(game_data, request.username),
+                }
+            )
 
+        with AnalysisPipeline() as pipeline:
+            analysis_result = pipeline.analyze_games(pipeline_input)
+
+        for game_summary in analysis_result["games"]:
+            for position_data in game_summary["positions"]:
+                db.add(
+                    Position(
+                        game_id=position_data["game_id"],
+                        move_number=position_data["move_number"],
+                        fen=position_data["fen"],
+                        player_move=position_data["player_move"],
+                        engine_best_move=position_data["engine_best_move"],
+                        evaluation_loss=position_data["evaluation_loss"],
+                        evaluation_before=position_data["evaluation_before"],
+                        evaluation_after=position_data["evaluation_after"],
+                        is_opening=position_data["is_opening"],
+                        is_middlegame=position_data["is_middlegame"],
+                        is_endgame=position_data["is_endgame"],
+                    )
+                )
+
+        for pattern_data in analysis_result["pattern_candidates"]:
+            db.add(
+                Pattern(
+                    pattern_name=pattern_data["name"],
+                    weakness_type=pattern_data["weakness_type"],
+                    frequency=pattern_data["frequency"],
+                    game_ids=pattern_data["game_ids"],
+                    position_features=pattern_data["position_features"],
+                    average_eval_loss=pattern_data["average_eval_loss"],
+                    player_username=request.username,
+                )
+            )
+
+        db.flush()
+        for game in db_games:
+            db.refresh(game)
+        _create_stats_record(db, request.username, db_games)
         db.commit()
 
-        # Track task status
         analysis_tasks[task_id] = {
-            "status": "analyzing",
-            "games_analyzed": len(games),
-            "patterns_found": 0,
+            "status": "completed",
+            "games_analyzed": len(fetched_games),
+            "patterns_found": len(analysis_result["pattern_candidates"]),
         }
 
         return AnalysisStatus(
-            status="analyzing",
+            status="completed",
             task_id=task_id,
-            games_analyzed=len(games),
-            patterns_found=0,
+            games_analyzed=len(fetched_games),
+            patterns_found=len(analysis_result["pattern_candidates"]),
         )
-
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        analysis_tasks[task_id] = {
+            "status": "failed",
+            "games_analyzed": len(fetched_games),
+            "patterns_found": 0,
+        }
         raise HTTPException(
-            status_code=400,
-            detail=f"Failed to fetch games: {str(e)}",
-        ) from e
+            status_code=500,
+            detail=f"Failed to analyze games: {exc}",
+        ) from exc
 
 
 @router.get("/analysis/{task_id}", response_model=AnalysisStatus)
 def get_analysis_status(task_id: str):
-    """Check the progress of an analysis task.
-
-    Args:
-        task_id: The task ID to check
-
-    Returns:
-        AnalysisStatus with current progress
-
-    Raises:
-        HTTPException: If task not found
-    """
+    """Check the progress of an analysis task."""
     if task_id not in analysis_tasks:
         raise HTTPException(status_code=404, detail="Task not found")
 
     task = analysis_tasks[task_id]
     return AnalysisStatus(
-        status=task["status"],
+        status=str(task["status"]),
         task_id=task_id,
-        games_analyzed=task["games_analyzed"],
-        patterns_found=task["patterns_found"],
+        games_analyzed=int(task["games_analyzed"]),
+        patterns_found=int(task["patterns_found"]),
     )
 
 
-@router.get("/games", response_model=List[GameResponse])
+@router.get("/games", response_model=list[GameResponse])
 def list_games(
     username: str,
+    db: DbSession,
     limit: int = 20,
     offset: int = 0,
-    db: Session = Depends(get_db),
 ):
-    """List all analyzed games for a player.
-
-    Args:
-        username: Chess.com username
-        limit: Number of games to return (default 20)
-        offset: Number of games to skip (default 0)
-        db: Database session dependency
-
-    Returns:
-        List of GameResponse objects
-    """
+    """List all analyzed games for a player."""
     games = (
         db.query(Game)
         .filter(Game.username == username)
@@ -203,39 +389,22 @@ def list_games(
         .all()
     )
 
-    # Calculate accuracy for each game (placeholder - would come from Position analysis)
-    result = []
-    for game in games:
-        accuracy = 85.0  # Placeholder - would be calculated from positions
-        result.append(
-            GameResponse(
-                id=game.id,
-                opponent_username=game.opponent_username,
-                result=game.result,
-                date=game.date,
-                accuracy=accuracy,
-            )
+    return [
+        GameResponse(
+            id=game.id,
+            opponent_username=game.opponent_username,
+            result=game.result,
+            date=game.date,
+            accuracy=_estimate_accuracy_from_acpl(_get_game_acpl(game)),
         )
-
-    return result
+        for game in games
+    ]
 
 
 @router.get("/stats", response_model=StatsResponse)
-def get_stats(username: str, db: Session = Depends(get_db)):
-    """Get dashboard statistics for a player.
-
-    Args:
-        username: Chess.com username
-        db: Database session dependency
-
-    Returns:
-        StatsResponse with aggregated player statistics
-
-    Raises:
-        HTTPException: If no stats found for player
-    """
+def get_stats(username: str, db: DbSession):
+    """Get dashboard statistics for a player."""
     stats = db.query(Stats).filter(Stats.player_username == username).first()
-
     if not stats:
         raise HTTPException(
             status_code=404,
@@ -246,37 +415,23 @@ def get_stats(username: str, db: Session = Depends(get_db)):
         total_games=stats.total_games,
         overall_accuracy=stats.total_accuracy,
         accuracy_by_phase=stats.accuracy_by_phase or {},
-        weakness_summary=[
-            {"weakness": "King safety", "frequency": 5, "avg_loss": 150},
-        ],
+        weakness_summary=_build_weakness_summary(db, username),
     )
 
 
-@router.get("/patterns", response_model=List[PatternResponse])
+@router.get("/patterns", response_model=list[PatternResponse])
 def get_patterns(
     username: str,
-    weakness_type: str = None,
+    db: DbSession,
+    weakness_type: str | None = None,
     limit: int = 10,
-    db: Session = Depends(get_db),
 ):
-    """Get discovered weakness patterns for a player.
-
-    Args:
-        username: Chess.com username
-        weakness_type: Optional filter by weakness type
-        limit: Maximum patterns to return (default 10)
-        db: Database session dependency
-
-    Returns:
-        List of PatternResponse objects
-    """
+    """Get discovered weakness patterns for a player."""
     query = db.query(Pattern).filter(Pattern.player_username == username)
-
     if weakness_type:
         query = query.filter(Pattern.weakness_type == weakness_type)
 
     patterns = query.order_by(Pattern.frequency.desc()).limit(limit).all()
-
     return [
         PatternResponse(
             id=pattern.id,
@@ -289,78 +444,80 @@ def get_patterns(
     ]
 
 
-# Phase 2 Advanced Analysis Endpoints
-
-
 @router.post("/advanced-analysis", response_model=AdvancedAnalysisResponse)
 async def start_advanced_analysis(
-    request: AdvancedAnalysisRequest, db: Session = Depends(get_db)
+    request: AdvancedAnalysisRequest,
+    db: DbSession,
 ):
-    """Start advanced analysis for a player.
-
-    Args:
-        request: AdvancedAnalysisRequest containing username and game_limit
-        db: Database session dependency
-
-    Returns:
-        AdvancedAnalysisResponse with job_id and status
-    """
-    job_id = str(uuid.uuid4())
-    job = AdvancedAnalysisJob(username=request.username, job_id=job_id, status="processing")
+    """Run advanced ML analyses for an already-analyzed player."""
+    job = AdvancedAnalysisJob(username=request.username)
     db.add(job)
     db.commit()
+    db.refresh(job)
 
     try:
         pipeline = AdvancedAnalysisPipeline(db)
-        pipeline.analyze_player(request.username)
+        result = pipeline.analyze_player(request.username)
+        if result["status"] != "completed":
+            job.status = "failed"
+            db.commit()
+            raise HTTPException(status_code=400, detail=result["message"])
+
         job.status = "completed"
         job.move_predictor_done = True
         job.anomaly_detector_done = True
         job.embedder_done = True
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
         db.commit()
-    except Exception as e:
+        return AdvancedAnalysisResponse(
+            job_id=str(job.job_id),
+            status=job.status,
+            username=request.username,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
         job.status = "failed"
         db.commit()
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-    return AdvancedAnalysisResponse(job_id=job_id, status="processing", username=request.username)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/advanced-analysis/{job_id}", response_model=AdvancedAnalysisStatusResponse)
-async def get_advanced_analysis_status(job_id: str, db: Session = Depends(get_db)):
-    """Check advanced analysis job status.
-
-    Args:
-        job_id: The job ID to check
-        db: Database session dependency
-
-    Returns:
-        AdvancedAnalysisStatusResponse with job status and progress
-
-    Raises:
-        HTTPException: If job not found
-    """
+async def get_advanced_analysis_status(job_id: str, db: DbSession):
+    """Check advanced analysis job status."""
     job = db.query(AdvancedAnalysisJob).filter(AdvancedAnalysisJob.job_id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Get counts for this user
-    user_games = db.query(Game).filter(Game.username == job.username).all()
-    game_ids = [g.id for g in user_games]
+    game_ids = [
+        game_id
+        for (game_id,) in db.query(Game.id).filter(Game.username == job.username).all()
+    ]
+    position_ids: list[int] = []
+    if game_ids:
+        position_ids = [
+            position_id
+            for (position_id,) in db.query(Position.id)
+            .filter(Position.game_id.in_(game_ids))
+            .all()
+        ]
 
-    unusual_moves = db.query(MovePrediction).filter(
-        MovePrediction.game_id.in_(game_ids)
-    ).count() if game_ids else 0
-
-    anomalies = db.query(Anomaly).filter(
-        Anomaly.game_id.in_(game_ids)
-    ).count() if game_ids else 0
-
-    embeddings = db.query(Embedding).count()
+    unusual_moves = 0
+    anomalies = 0
+    embeddings = 0
+    if game_ids:
+        unusual_moves = db.query(MovePrediction).filter(
+            MovePrediction.game_id.in_(game_ids)
+        ).count()
+        anomalies = db.query(Anomaly).filter(Anomaly.game_id.in_(game_ids)).count()
+    if position_ids:
+        embeddings = db.query(Embedding).filter(
+            Embedding.position_id.in_(position_ids)
+        ).count()
 
     return AdvancedAnalysisStatusResponse(
-        job_id=job_id,
+        job_id=str(job.job_id),
         status=job.status,
         username=job.username,
         move_predictor_done=job.move_predictor_done,
@@ -372,90 +529,56 @@ async def get_advanced_analysis_status(job_id: str, db: Session = Depends(get_db
     )
 
 
-@router.get("/move-predictions", response_model=List[MovePredictionResponse])
+@router.get("/move-predictions", response_model=list[MovePredictionResponse])
 async def get_move_predictions(
-    username: Optional[str] = None,
-    game_id: Optional[int] = None,
+    db: DbSession,
+    username: str | None = None,
+    game_id: int | None = None,
     min_probability: float = 0.0,
-    db: Session = Depends(get_db),
 ):
-    """Get unusual move predictions.
-
-    Args:
-        username: Optional filter by username
-        game_id: Optional filter by game ID
-        min_probability: Minimum probability score (0-1)
-        db: Database session dependency
-
-    Returns:
-        List of MovePredictionResponse objects
-    """
+    """Get unusual move predictions."""
     query = db.query(MovePrediction)
-
     if username:
         query = query.join(Game).filter(Game.username == username)
-
     if game_id:
         query = query.filter(MovePrediction.game_id == game_id)
 
-    predictions = query.filter(MovePrediction.probability_score >= min_probability).all()
-    return predictions
+    return query.filter(MovePrediction.probability_score >= min_probability).all()
 
 
-@router.get("/anomalies", response_model=List[AnomalyResponse])
+@router.get("/anomalies", response_model=list[AnomalyResponse])
 async def get_anomalies(
-    username: Optional[str] = None,
-    game_id: Optional[int] = None,
+    db: DbSession,
+    username: str | None = None,
+    game_id: int | None = None,
     min_score: float = 0.0,
-    db: Session = Depends(get_db),
 ):
-    """Get detected anomalies (rare mistakes).
-
-    Args:
-        username: Optional filter by username
-        game_id: Optional filter by game ID
-        min_score: Minimum anomaly score (0-1)
-        db: Database session dependency
-
-    Returns:
-        List of AnomalyResponse objects sorted by anomaly score
-    """
+    """Get detected anomalies."""
     query = db.query(Anomaly)
-
     if username:
         query = query.join(Game).filter(Game.username == username)
-
     if game_id:
         query = query.filter(Anomaly.game_id == game_id)
 
-    anomalies = query.filter(Anomaly.anomaly_score >= min_score).order_by(
-        Anomaly.anomaly_score.desc()
-    ).all()
-    return anomalies
+    return (
+        query.filter(Anomaly.anomaly_score >= min_score)
+        .order_by(Anomaly.anomaly_score.desc())
+        .all()
+    )
 
 
-@router.get("/similar-positions", response_model=List[SimilarPositionResponse])
+@router.get("/similar-positions", response_model=list[SimilarPositionResponse])
 async def get_similar_positions(
-    position_fen: str, limit: int = 10, db: Session = Depends(get_db)
+    position_fen: str,
+    db: DbSession,
+    limit: int = 10,
 ):
-    """Find semantically similar positions.
-
-    Args:
-        position_fen: FEN string of the reference position
-        limit: Maximum number of similar positions to return
-        db: Database session dependency
-
-    Returns:
-        List of SimilarPositionResponse objects
-
-    Raises:
-        HTTPException: If position or embedding not found
-    """
-    input_pos = db.query(Position).filter(Position.fen == position_fen).first()
-    if not input_pos:
+    """Find semantically similar positions."""
+    input_position = db.query(Position).filter(Position.fen == position_fen).first()
+    if not input_position:
         raise HTTPException(status_code=404, detail="Position not found")
 
-    input_embedding = db.query(Embedding).filter(Embedding.position_id == input_pos.id).first()
+    input_embedding = db.query(Embedding).filter(Embedding.position_id == input_position.id).first()
     if not input_embedding:
         raise HTTPException(status_code=404, detail="Embedding not found")
 
@@ -463,55 +586,69 @@ async def get_similar_positions(
     if not all_embeddings:
         return []
 
-    pipeline = AdvancedAnalysisPipeline(db)
-    all_vectors = np.array([e.embedding_vector for e in all_embeddings])
-
-    similar_indices = pipeline.embedder.find_similar(
-        np.array(input_embedding.embedding_vector), all_vectors, k=min(limit, len(all_embeddings))
+    embedder = PositionEmbedder()
+    candidate_vectors = np.array([embedding.embedding_vector for embedding in all_embeddings])
+    similar_indices = embedder.find_similar(
+        np.array(input_embedding.embedding_vector),
+        candidate_vectors,
+        k=min(limit + 1, len(all_embeddings)),
     )
 
-    results = []
+    results: list[SimilarPositionResponse] = []
     for idx in similar_indices:
-        emb = all_embeddings[idx]
-        pos = emb.position
-        similarity = pipeline.embedder.get_similarity_score(
-            np.array(input_embedding.embedding_vector), np.array(emb.embedding_vector)
+        embedding = all_embeddings[idx]
+        if embedding.position_id == input_position.id:
+            continue
+        position = embedding.position
+        similarity = embedder.get_similarity_score(
+            np.array(input_embedding.embedding_vector),
+            np.array(embedding.embedding_vector),
         )
         results.append(
             SimilarPositionResponse(
-                position_id=pos.id,
-                similarity_score=float(similarity),
-                game_id=pos.game_id,
-                centipawn_loss=float(pos.evaluation_loss or 0.0),
-                position_fen=pos.fen,
+                position_id=position.id,
+                similarity_score=similarity,
+                game_id=position.game_id,
+                centipawn_loss=float(position.evaluation_loss or 0.0),
+                position_fen=position.fen,
             )
         )
+        if len(results) >= limit:
+            break
 
     return results
 
 
 @router.get("/pattern-details/{pattern_id}", response_model=PatternDetailResponse)
-async def get_pattern_details(pattern_id: int, db: Session = Depends(get_db)):
-    """Get detailed pattern information with Phase 2 data.
-
-    Args:
-        pattern_id: The pattern ID to get details for
-        db: Database session dependency
-
-    Returns:
-        PatternDetailResponse with comprehensive pattern information
-
-    Raises:
-        HTTPException: If pattern not found
-    """
+async def get_pattern_details(pattern_id: int, db: DbSession):
+    """Get detailed pattern information with phase 2 data."""
     pattern = db.query(Pattern).filter(Pattern.id == pattern_id).first()
     if not pattern:
         raise HTTPException(status_code=404, detail="Pattern not found")
 
-    # Determine study priority based on frequency and average loss
+    game_ids = pattern.game_ids or []
+    unusual_moves = 0
+    anomalies = 0
+    if game_ids:
+        unusual_moves = db.query(MovePrediction).filter(
+            MovePrediction.game_id.in_(game_ids)
+        ).count()
+        anomalies = db.query(Anomaly).filter(Anomaly.game_id.in_(game_ids)).count()
+
+    similar_patterns = (
+        db.query(Pattern.id)
+        .filter(
+            Pattern.player_username == pattern.player_username,
+            Pattern.weakness_type == pattern.weakness_type,
+            Pattern.id != pattern.id,
+        )
+        .order_by(Pattern.frequency.desc(), Pattern.average_eval_loss.desc())
+        .limit(3)
+        .all()
+    )
+
     frequency = pattern.frequency or 0
     avg_loss = pattern.average_eval_loss or 0.0
-
     if frequency > PRIORITY_CRITICAL_FREQUENCY and avg_loss > PRIORITY_CRITICAL_LOSS:
         study_priority = "critical"
     elif frequency > PRIORITY_HIGH_FREQUENCY or avg_loss > PRIORITY_HIGH_LOSS:
@@ -525,92 +662,75 @@ async def get_pattern_details(pattern_id: int, db: Session = Depends(get_db)):
         type=pattern.weakness_type,
         frequency=frequency,
         avg_loss=avg_loss,
-        affected_games=len(pattern.game_ids) if pattern.game_ids else 0,
-        unusual_moves_in_pattern=0,
-        anomaly_count=0,
-        similar_patterns=[],
+        affected_games=len(game_ids),
+        unusual_moves_in_pattern=unusual_moves,
+        anomaly_count=anomalies,
+        similar_patterns=[similar_pattern_id for (similar_pattern_id,) in similar_patterns],
         study_priority=study_priority,
     )
 
 
-# Phase 3 Study Plan API Endpoints
-
-
 @router.post("/study-plan/generate", response_model=StudyPlanGenerateResponse)
 def generate_study_plan(
-    request: StudyPlanGenerateRequest, db: Session = Depends(get_db)
+    request: StudyPlanGenerateRequest,
+    db: DbSession,
 ):
-    """Generate a personalized study plan for a player.
-
-    Creates study plans from weakness patterns with frequency-based prioritization.
-
-    Args:
-        request: StudyPlanGenerateRequest with username and optional game_limit
-        db: Database session dependency
-
-    Returns:
-        StudyPlanGenerateResponse with summary of created plans and distribution
-
-    Raises:
-        HTTPException: If generation fails
-    """
+    """Generate a personalized study plan for a player."""
     try:
         generator = StudyPlanGenerator(db)
         result = generator.generate_study_plan(request.username, request.game_limit)
-
         return StudyPlanGenerateResponse(
             username=result["username"],
             total_weaknesses=result["total_weaknesses"],
             study_plans_created=result["study_plans_created"],
             priority_distribution=result["priority_distribution"],
         )
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to generate study plan: {str(e)}",
-        ) from e
+            detail=f"Failed to generate study plan: {exc}",
+        ) from exc
 
 
-@router.get("/study-plan", response_model=List[StudyPlanResponse])
+@router.get("/study-plan", response_model=list[StudyPlanResponse])
 def list_study_plans(
-    user_id: str,
-    status: Optional[str] = None,
-    concept_type: Optional[str] = None,
-    sort_by: Optional[str] = "created_at",
-    db: Session = Depends(get_db),
+    db: DbSession,
+    user_id: str | None = None,
+    username: str | None = None,
+    status: str | None = None,
+    concept_type: str | None = None,
+    sort_by: str = "created_at",
 ):
-    """List study plans for a user with optional filtering and sorting.
+    """List study plans for a user with optional filtering and sorting."""
+    resolved_user_id = user_id or username
+    if not resolved_user_id:
+        raise HTTPException(status_code=400, detail="Missing user identifier")
 
-    Args:
-        user_id: User identifier
-        status: Filter by status (active, completed, paused)
-        concept_type: Filter by concept type
-        sort_by: Sort field (priority_score, created_at, etc.)
-        db: Database session dependency
-
-    Returns:
-        List of StudyPlanResponse objects
-
-    Raises:
-        HTTPException: If query fails
-    """
     try:
-        query = db.query(StudyPlan).filter(StudyPlan.user_id == user_id)
-
-        if status:
+        query = db.query(StudyPlan).filter(StudyPlan.user_id == resolved_user_id)
+        if status and status != "all":
             query = query.filter(StudyPlan.status == status)
+        if concept_type and concept_type != "all":
+            query = (
+                query.join(ConceptMap, ConceptMap.weakness_id == StudyPlan.weakness_id)
+                .filter(ConceptMap.concept_type == concept_type)
+                .distinct()
+            )
 
-        # Handle sorting
         if sort_by == "priority_score":
             query = query.order_by(StudyPlan.priority_score.desc())
         else:
             query = query.order_by(StudyPlan.created_at.desc())
 
         plans = query.all()
-
-        # Batch query concepts instead of per-plan queries (prevents N+1 pattern)
         weakness_ids = [plan.weakness_id for plan in plans]
-        concept_counts = {wid: 0 for wid in weakness_ids}
+        concept_counts = dict.fromkeys(weakness_ids, 0)
+        patterns_by_id = {}
+        if weakness_ids:
+            patterns_by_id = {
+                pattern.id: pattern
+                for pattern in db.query(Pattern).filter(Pattern.id.in_(weakness_ids)).all()
+            }
         if weakness_ids:
             concepts = (
                 db.query(ConceptMap)
@@ -620,238 +740,168 @@ def list_study_plans(
             for concept in concepts:
                 concept_counts[concept.weakness_id] = concept_counts.get(concept.weakness_id, 0) + 1
 
-        result = []
-        for plan in plans:
-            result.append(
-                StudyPlanResponse(
-                    id=str(plan.id),
-                    user_id=plan.user_id,
-                    weakness_id=plan.weakness_id,
-                    priority_score=plan.priority_score,
-                    status=plan.status,
-                    concept_count=concept_counts.get(plan.weakness_id, 0),
-                    created_at=plan.created_at,
-                )
+        return [
+            StudyPlanResponse(
+                id=str(plan.id),
+                user_id=plan.user_id,
+                weakness_id=plan.weakness_id,
+                weakness_name=patterns_by_id.get(plan.weakness_id).pattern_name
+                if patterns_by_id.get(plan.weakness_id)
+                else None,
+                weakness_type=patterns_by_id.get(plan.weakness_id).weakness_type
+                if patterns_by_id.get(plan.weakness_id)
+                else None,
+                priority_score=plan.priority_score,
+                status=plan.status,
+                concept_count=concept_counts.get(plan.weakness_id, 0),
+                created_at=plan.created_at,
             )
-
-        return result
-
-    except Exception as e:
+            for plan in plans
+        ]
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to list study plans: {str(e)}",
-        ) from e
+            detail=f"Failed to list study plans: {exc}",
+        ) from exc
 
 
 @router.patch("/study-plan/{study_plan_id}/mark-studied", response_model=MarkStudiedResponse)
 def mark_study_plan_studied(
-    study_plan_id: str, request: MarkStudiedRequest, db: Session = Depends(get_db)
+    study_plan_id: str,
+    request: MarkStudiedRequest,
+    db: DbSession,
 ):
-    """Mark a study plan as studied.
-
-    Updates plan status to completed and sets marked_studied_at timestamp.
-
-    Args:
-        study_plan_id: UUID of the study plan
-        request: MarkStudiedRequest (empty body)
-        db: Database session dependency
-
-    Returns:
-        MarkStudiedResponse with updated plan details
-
-    Raises:
-        HTTPException: If plan not found or update fails
-    """
+    """Mark a study plan as studied."""
+    _ = request
     try:
-        # Validate study plan ID format
         plan_uuid = uuid.UUID(validate_uuid_param(study_plan_id, "study plan ID"))
-
         plan = db.query(StudyPlan).filter(StudyPlan.id == plan_uuid).first()
-
         if not plan:
             raise HTTPException(status_code=404, detail="Study plan not found")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         plan.status = "completed"
         plan.marked_studied_at = now
         plan.updated_at = now
-
         db.commit()
         db.refresh(plan)
-
         return MarkStudiedResponse(
             id=str(plan.id),
             status=plan.status,
             marked_studied_at=plan.marked_studied_at,
         )
-
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to mark study plan as studied: {str(e)}",
-        ) from e
+            detail=f"Failed to mark study plan as studied: {exc}",
+        ) from exc
 
 
 @router.get("/study-plan/progress", response_model=StudyProgressResponse)
-def get_study_progress(user_id: str, db: Session = Depends(get_db)):
-    """Get study progress for a user.
+def get_study_progress(
+    db: DbSession,
+    user_id: str | None = None,
+    username: str | None = None,
+):
+    """Get study progress for a user."""
+    resolved_user_id = user_id or username
+    if not resolved_user_id:
+        raise HTTPException(status_code=400, detail="Missing user identifier")
 
-    Returns completion metrics and progress on study plans.
-
-    Args:
-        user_id: User identifier
-        db: Database session dependency
-
-    Returns:
-        StudyProgressResponse with progress metrics
-
-    Raises:
-        HTTPException: If query fails
-    """
     try:
-        total_plans = db.query(StudyPlan).filter(StudyPlan.user_id == user_id).count()
-
+        total_plans = db.query(StudyPlan).filter(StudyPlan.user_id == resolved_user_id).count()
         active_plans = (
             db.query(StudyPlan)
-            .filter(StudyPlan.user_id == user_id, StudyPlan.status == "active")
+            .filter(StudyPlan.user_id == resolved_user_id, StudyPlan.status == "active")
             .count()
         )
-
         completed_plans = (
             db.query(StudyPlan)
-            .filter(StudyPlan.user_id == user_id, StudyPlan.status == "completed")
+            .filter(
+                StudyPlan.user_id == resolved_user_id,
+                StudyPlan.status == "completed",
+            )
             .count()
         )
-
-        completion_rate = (
-            (completed_plans / total_plans * 100) if total_plans > 0 else 0.0
-        )
-
+        completion_rate = (completed_plans / total_plans * 100.0) if total_plans else 0.0
         return StudyProgressResponse(
-            user_id=user_id,
+            user_id=resolved_user_id,
             total_plans=total_plans,
             active_plans=active_plans,
             completed_plans=completed_plans,
             completion_rate=completion_rate,
         )
-
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get study progress: {str(e)}",
-        ) from e
+            detail=f"Failed to get study progress: {exc}",
+        ) from exc
 
 
 @router.get("/study-plan/{study_plan_id}/concepts", response_model=ConceptListResponse)
-def get_study_plan_concepts(
-    study_plan_id: str, db: Session = Depends(get_db)
-):
-    """Get learning concepts for a study plan.
-
-    Returns concepts mapped to the weakness pattern.
-
-    Args:
-        study_plan_id: UUID of the study plan
-        db: Database session dependency
-
-    Returns:
-        ConceptListResponse with list of concepts
-
-    Raises:
-        HTTPException: If plan not found or query fails
-    """
+def get_study_plan_concepts(study_plan_id: str, db: DbSession):
+    """Get learning concepts for a study plan."""
     try:
-        # Validate study plan ID format
         plan_uuid = uuid.UUID(validate_uuid_param(study_plan_id, "study plan ID"))
-
         plan = db.query(StudyPlan).filter(StudyPlan.id == plan_uuid).first()
-
         if not plan:
             raise HTTPException(status_code=404, detail="Study plan not found")
 
-        concept_maps = (
-            db.query(ConceptMap)
-            .filter(ConceptMap.weakness_id == plan.weakness_id)
-            .all()
-        )
-
+        concept_maps = db.query(ConceptMap).filter(ConceptMap.weakness_id == plan.weakness_id).all()
         concepts = [
-            {"type": cm.concept_type, "name": cm.concept_name} for cm in concept_maps
+            {"type": concept.concept_type, "name": concept.concept_name}
+            for concept in concept_maps
         ]
-
         return ConceptListResponse(concepts=concepts)
-
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get study plan concepts: {str(e)}",
-        ) from e
+            detail=f"Failed to get study plan concepts: {exc}",
+        ) from exc
 
 
-@router.get("/study-plan/{study_plan_id}/games", response_model=List[StudyGameDetailResponse])
-def get_study_plan_games(
-    study_plan_id: str, db: Session = Depends(get_db)
-):
-    """Get games associated with a study plan's weakness pattern.
-
-    Returns game details for games that contain the weakness.
-
-    Args:
-        study_plan_id: UUID of the study plan
-        db: Database session dependency
-
-    Returns:
-        List of StudyGameDetailResponse objects
-
-    Raises:
-        HTTPException: If plan not found or query fails
-    """
+@router.get("/study-plan/{study_plan_id}/games", response_model=list[StudyGameDetailResponse])
+def get_study_plan_games(study_plan_id: str, db: DbSession):
+    """Get games associated with a study plan's weakness pattern."""
     try:
-        # Validate study plan ID format
         plan_uuid = uuid.UUID(validate_uuid_param(study_plan_id, "study plan ID"))
-
         plan = db.query(StudyPlan).filter(StudyPlan.id == plan_uuid).first()
-
         if not plan:
             raise HTTPException(status_code=404, detail="Study plan not found")
 
-        # Get pattern details
         pattern = db.query(Pattern).filter(Pattern.id == plan.weakness_id).first()
-
-        if not pattern:
+        if not pattern or not pattern.game_ids:
             return []
 
-        # Get game IDs from pattern
-        game_ids = pattern.game_ids if pattern.game_ids else []
+        games = db.query(Game).filter(Game.id.in_(pattern.game_ids)).all()
+        positions = db.query(Position).filter(Position.game_id.in_(pattern.game_ids)).all()
+        positions_by_game: dict[int, list[Position]] = {}
+        for position in positions:
+            positions_by_game.setdefault(position.game_id, []).append(position)
 
-        if not game_ids:
-            return []
-
-        # Fetch games
-        games = db.query(Game).filter(Game.id.in_(game_ids)).all()
-
-        result = []
+        results: list[StudyGameDetailResponse] = []
         for game in games:
-            # Get positions for this game
-            positions = db.query(Position).filter(Position.game_id == game.id).all()
-
-            # Calculate accuracy
-            eval_losses = [p.evaluation_loss for p in positions if p.evaluation_loss]
-            avg_eval_loss = (
-                sum(eval_losses) / len(eval_losses) if eval_losses else 0.0
-            )
-            accuracy = max(0, 100 - (avg_eval_loss / 50))  # Rough approximation
-
-            # Get best move position FEN
+            game_positions = positions_by_game.get(game.id, [])
+            eval_losses = [
+                position.evaluation_loss
+                for position in game_positions
+                if position.evaluation_loss is not None
+            ]
+            avg_eval_loss = float(mean(eval_losses)) if eval_losses else 0.0
+            accuracy = _estimate_accuracy_from_acpl(avg_eval_loss)
             position_fen = (
-                positions[0].fen if positions else "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+                max(
+                    game_positions,
+                    key=lambda position: position.evaluation_loss or 0.0,
+                ).fen
+                if game_positions
+                else "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
             )
-
-            result.append(
+            results.append(
                 StudyGameDetailResponse(
                     game_id=game.id,
                     study_plan_id=str(plan.id),
@@ -863,12 +913,11 @@ def get_study_plan_games(
                 )
             )
 
-        return result
-
+        return results
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get study plan games: {str(e)}",
-        ) from e
+            detail=f"Failed to get study plan games: {exc}",
+        ) from exc

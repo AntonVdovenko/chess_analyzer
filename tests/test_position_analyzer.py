@@ -20,7 +20,7 @@ def test_calculate_centipawn_loss(analyzer_with_mock_engine):
     """Test centipawn loss calculation."""
     analyzer = analyzer_with_mock_engine
     loss = analyzer.calculate_centipawn_loss(eval_before=0.3, eval_after=-0.8)
-    assert loss == 1.1
+    assert loss == pytest.approx(110.0)
 
 
 def test_calculate_centipawn_loss_zero(analyzer_with_mock_engine):
@@ -35,7 +35,7 @@ def test_calculate_centipawn_loss_symmetric(analyzer_with_mock_engine):
     analyzer = analyzer_with_mock_engine
     loss1 = analyzer.calculate_centipawn_loss(eval_before=0.0, eval_after=1.5)
     loss2 = analyzer.calculate_centipawn_loss(eval_before=1.5, eval_after=0.0)
-    assert loss1 == loss2 == 1.5
+    assert loss1 == loss2 == 150.0
 
 
 def test_analyze_position_returns_best_move(analyzer_with_mock_engine):
@@ -75,7 +75,7 @@ def test_get_acpl(analyzer_with_mock_engine):
         {"eval_before": 1.0, "eval_after": 0.0},
     ]
     acpl = analyzer.get_acpl(positions)
-    expected_acpl = (0.0 + 0.3 + 1.0) / 3
+    expected_acpl = (0.0 + 30.0 + 100.0) / 3
     assert acpl == pytest.approx(expected_acpl, rel=0.01)
 
 

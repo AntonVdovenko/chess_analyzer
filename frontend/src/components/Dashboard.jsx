@@ -86,14 +86,20 @@ export default function Dashboard() {
       {patterns.length > 0 && (
         <div className="patterns-section">
           <h2>Patterns Found</h2>
-          {patterns.map((p) => (
-            <div key={p.id} className="pattern-card">
-              <h3>{p.name}</h3>
-              <p>Type: {p.type}</p>
-              <p>Frequency: {p.frequency}</p>
-              <p>Avg Loss: {p.avg_loss.toFixed(1)}</p>
-            </div>
-          ))}
+          {patterns.map((p) => {
+            const name = p.name ?? p.pattern_name ?? `Pattern ${p.id}`;
+            const weaknessType = p.weakness_type ?? p.type ?? 'Unknown';
+            const averageEvalLoss = p.average_eval_loss ?? p.avg_loss ?? 0;
+
+            return (
+              <div key={p.id} className="pattern-card">
+                <h3>{name}</h3>
+                <p>Type: {weaknessType}</p>
+                <p>Frequency: {p.frequency ?? 0}</p>
+                <p>Avg Loss: {Number(averageEvalLoss).toFixed(1)}</p>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

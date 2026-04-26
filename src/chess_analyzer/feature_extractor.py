@@ -1,5 +1,6 @@
+"""Utilities for extracting numeric features from chess positions."""
+
 import chess
-from typing import Dict
 
 
 class FeatureExtractor:
@@ -20,11 +21,11 @@ class FeatureExtractor:
         white_material = 0
         black_material = 0
 
-        for piece_type in piece_values:
+        for piece_type, piece_value in piece_values.items():
             white_count = len(board.pieces(piece_type, chess.WHITE))
             black_count = len(board.pieces(piece_type, chess.BLACK))
-            white_material += white_count * piece_values[piece_type]
-            black_material += black_count * piece_values[piece_type]
+            white_material += white_count * piece_value
+            black_material += black_count * piece_value
 
         return float(white_material - black_material)
 
@@ -39,7 +40,6 @@ class FeatureExtractor:
         board = chess.Board(fen)
 
         white_king_pos = board.king(chess.WHITE)
-        black_king_pos = board.king(chess.BLACK)
 
         white_king_file = chess.square_file(white_king_pos)
         white_king_rank = chess.square_rank(white_king_pos)
@@ -49,7 +49,33 @@ class FeatureExtractor:
 
         return max(0.0, min(100.0, safety_score))
 
-    def extract_all_features(self, fen: str) -> Dict[str, float]:
+    def classify_phase(self, fen: str, move_number: int) -> str:
+        """Classify a position into opening, middlegame, or endgame."""
+        board = chess.Board(fen)
+        major_minor_count = sum(
+            len(board.pieces(piece_type, chess.WHITE))
+            + len(board.pieces(piece_type, chess.BLACK))
+            for piece_type in (
+                chess.KNIGHT,
+                chess.BISHOP,
+                chess.ROOK,
+                chess.QUEEN,
+            )
+        )
+        queens_remaining = (
+            len(board.pieces(chess.QUEEN, chess.WHITE))
+            + len(board.pieces(chess.QUEEN, chess.BLACK))
+        )
+
+        if move_number <= 20:
+            return "opening"
+        if queens_remaining == 0 and major_minor_count <= 6:
+            return "endgame"
+        if major_minor_count <= 4:
+            return "endgame"
+        return "middlegame"
+
+    def extract_all_features(self, fen: str) -> dict[str, float]:
         """Extract all relevant features from a position."""
         return {
             "material_balance": self.extract_material_balance(fen),

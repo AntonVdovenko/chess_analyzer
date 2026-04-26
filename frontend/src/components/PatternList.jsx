@@ -10,7 +10,8 @@ export default function PatternList({ patterns, onSelectPattern, showAdvanced })
         // Determine priority based on frequency and loss
         let priority = 'medium';
         const frequency = pattern.frequency || 0;
-        const avgLoss = pattern.average_eval_loss || 0;
+        const avgLoss = pattern.average_eval_loss ?? pattern.avg_loss ?? 0;
+        const name = pattern.name ?? pattern.pattern_name ?? `Pattern ${pattern.id}`;
 
         if (frequency > 10 && avgLoss > 200) {
           priority = 'critical';
@@ -30,7 +31,7 @@ export default function PatternList({ patterns, onSelectPattern, showAdvanced })
             }}
           >
             <div className="pattern-header">
-              <h3>{pattern.pattern_name}</h3>
+              <h3>{name}</h3>
               <span className={`priority ${priority}`}>
                 {priority.charAt(0).toUpperCase() + priority.slice(1)}
               </span>

@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+
 from src.chess_analyzer.ml_models.clustering import WeaknessClustering
 
 

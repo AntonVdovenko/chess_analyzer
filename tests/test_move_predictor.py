@@ -1,5 +1,5 @@
-import pytest
 from unittest.mock import Mock
+
 from src.chess_analyzer.ml_models.move_predictor import MovePredictor
 
 

@@ -1,6 +1,8 @@
 export default function PatternDetail({ pattern, onBack }) {
   const frequency = pattern.frequency || 0;
-  const avgLoss = pattern.average_eval_loss || 0;
+  const avgLoss = pattern.average_eval_loss ?? pattern.avg_loss ?? 0;
+  const name = pattern.name ?? pattern.pattern_name ?? `Pattern ${pattern.id}`;
+  const weaknessType = pattern.weakness_type ?? pattern.type ?? 'Unknown';
 
   let priority = 'medium';
   if (frequency > 10 && avgLoss > 200) {
@@ -14,13 +16,13 @@ export default function PatternDetail({ pattern, onBack }) {
       <button className="btn-back" onClick={onBack}>
         ← Back to Patterns
       </button>
-      <h2>{pattern.pattern_name}</h2>
+      <h2>{name}</h2>
       <div className="detail-grid">
         <div className="detail-card">
           <h3>Overview</h3>
           <div className="detail-row">
             <span className="label">Type:</span>
-            <span className="value">{pattern.weakness_type || 'Unknown'}</span>
+            <span className="value">{weaknessType}</span>
           </div>
           <div className="detail-row">
             <span className="label">Priority:</span>

@@ -1,15 +1,14 @@
 """Tests for StudyPlan, ConceptMap, and StudySession ORM models."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.chess_analyzer.database.models import (
-    Base,
     ConceptMap,
     Pattern,
     StudyPlan,
@@ -146,7 +145,7 @@ class TestStudyPlanModel:
         assert study_plan.marked_studied_at is None
 
         # Mark as studied
-        study_plan.marked_studied_at = datetime.now(timezone.utc)
+        study_plan.marked_studied_at = datetime.now(UTC)
         test_db.commit()
         test_db.refresh(study_plan)
 
@@ -398,7 +397,7 @@ class TestStudySessionModel:
         assert study_session.completed_at is None
 
         # Mark as completed
-        study_session.completed_at = datetime.now(timezone.utc)
+        study_session.completed_at = datetime.now(UTC)
         test_db.commit()
         test_db.refresh(study_session)
 

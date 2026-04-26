@@ -1,6 +1,7 @@
-import pytest
-import numpy as np
 from unittest.mock import Mock
+
+import numpy as np
+
 from src.chess_analyzer.ml_models.embeddings import PositionEmbedder
 
 

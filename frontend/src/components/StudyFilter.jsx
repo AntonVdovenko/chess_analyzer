@@ -1,9 +1,10 @@
 import React from 'react';
 
 export default function StudyFilter({ plans, filters, onFilterChange }) {
-  // Extract unique values from plans
-  const uniqueStatuses = ['all', ...new Set(plans.map((p) => p.status).filter(Boolean))];
-  const uniqueConceptTypes = ['all', ...new Set(plans.map((p) => p.concept_type).filter(Boolean))];
+  const statusOptions = ['all', 'active', 'completed', 'paused'].filter((status, index) => {
+    if (index === 0) return true;
+    return plans.some((plan) => plan.status === status) || filters.status === status || !plans.length;
+  });
 
   const handleFilterChange = (fieldName) => (e) => {
     onFilterChange({
@@ -23,24 +24,9 @@ export default function StudyFilter({ plans, filters, onFilterChange }) {
           value={filters.status || 'all'}
           onChange={handleFilterChange('status')}
         >
-          {uniqueStatuses.map((status) => (
+          {statusOptions.map((status) => (
             <option key={status} value={status}>
               {status.charAt(0).toUpperCase() + status.slice(1)}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="filter-group">
-        <label htmlFor="concept-filter">Concept Type</label>
-        <select
-          id="concept-filter"
-          value={filters.concept_type || 'all'}
-          onChange={handleFilterChange('concept_type')}
-        >
-          {uniqueConceptTypes.map((type) => (
-            <option key={type} value={type}>
-              {type.charAt(0).toUpperCase() + type.slice(1)}
             </option>
           ))}
         </select>

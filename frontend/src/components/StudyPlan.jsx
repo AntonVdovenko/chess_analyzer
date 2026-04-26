@@ -15,7 +15,6 @@ export default function StudyPlan() {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     status: 'active',
-    concept_type: null,
     sort_by: 'created_at',
   });
   const [showDetails, setShowDetails] = useState(false);
@@ -82,7 +81,7 @@ export default function StudyPlan() {
 
   const handleMarkStudied = async (planId) => {
     try {
-      await chessAPI.markWeaknessStudied(planId, 0, 0);
+      await chessAPI.markWeaknessStudied(planId);
       // Reload plans and progress after marking as studied
       await loadStudyPlans(username);
       await loadStudyProgress(username);
@@ -93,14 +92,7 @@ export default function StudyPlan() {
     }
   };
 
-  // Memoize filtered plans to avoid unnecessary recalculations
-  const filteredPlans = useMemo(() => {
-    // Server already handles status and sort_by filtering, only filter by concept_type
-    if (!filters.concept_type || filters.concept_type === 'all') {
-      return studyPlans;
-    }
-    return studyPlans.filter((plan) => plan.concept_type === filters.concept_type);
-  }, [studyPlans, filters.concept_type]);
+  const filteredPlans = useMemo(() => studyPlans, [studyPlans]);
 
   return (
     <div className="study-plan-container">

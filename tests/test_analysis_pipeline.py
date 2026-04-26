@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 
 from src.chess_analyzer.analysis_pipeline import AnalysisPipeline
 
@@ -7,10 +8,10 @@ from src.chess_analyzer.analysis_pipeline import AnalysisPipeline
 @pytest.fixture
 def pipeline_with_mocks():
     """Create pipeline with mocked engine and components."""
-    with patch("src.chess_analyzer.analysis_pipeline.PositionAnalyzer") as mock_pa:
-        with patch("src.chess_analyzer.analysis_pipeline.PGNParser") as mock_pgn:
-            with patch("src.chess_analyzer.analysis_pipeline.FeatureExtractor") as mock_fe:
-                with patch("src.chess_analyzer.analysis_pipeline.WeaknessClustering") as mock_cluster:
+    with patch("src.chess_analyzer.analysis_pipeline.PositionAnalyzer"):
+        with patch("src.chess_analyzer.analysis_pipeline.PGNParser"):
+            with patch("src.chess_analyzer.analysis_pipeline.FeatureExtractor"):
+                with patch("src.chess_analyzer.analysis_pipeline.WeaknessClustering"):
                     pipeline = AnalysisPipeline()
 
                     # Setup mocks for position analyzer

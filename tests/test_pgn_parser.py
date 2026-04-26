@@ -1,4 +1,3 @@
-import pytest
 from src.chess_analyzer.pgn_parser import PGNParser
 
 

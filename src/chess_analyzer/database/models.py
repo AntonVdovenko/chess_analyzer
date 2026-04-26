@@ -1,23 +1,22 @@
 """SQLAlchemy ORM models for chess analyzer."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
     Float,
     ForeignKey,
     Integer,
-    JSON,
     String,
     Text,
     func,
 )
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 
@@ -37,7 +36,7 @@ class Game(Base):
     pgn = Column(Text)
     white_elo = Column(Integer, nullable=True)
     black_elo = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationships
     positions = relationship("Position", back_populates="game", cascade="all, delete-orphan")
@@ -60,7 +59,7 @@ class Position(Base):
     is_opening = Column(Boolean, default=False)
     is_middlegame = Column(Boolean, default=False)
     is_endgame = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationships
     game = relationship("Game", back_populates="positions")
@@ -79,7 +78,7 @@ class Pattern(Base):
     position_features = Column(JSON)
     average_eval_loss = Column(Float)
     player_username = Column(String(100), index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationships
     study_plans = relationship("StudyPlan", back_populates="weakness", cascade="all, delete-orphan")
@@ -97,8 +96,8 @@ class Stats(Base):
     total_accuracy = Column(Float)
     accuracy_by_phase = Column(JSON)
     win_loss_ratio = Column(Float)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
 class MovePrediction(Base):
@@ -175,8 +174,8 @@ class StudyPlan(Base):
     priority_score = Column(Float, nullable=False, index=True)  # Score from 0-1 indicating urgency (normalized frequency)
     status = Column(String(50), nullable=False, index=True)  # "active", "completed", "paused"
     marked_studied_at = Column(DateTime, nullable=True)  # When user marked pattern as studied
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     # Relationships
     weakness = relationship("Pattern", back_populates="study_plans", foreign_keys=[weakness_id])
@@ -192,7 +191,7 @@ class ConceptMap(Base):
     weakness_id = Column(Integer, ForeignKey("patterns.id"), nullable=False, index=True)
     concept_type = Column(String(100), nullable=False)  # e.g., "tactic", "strategy", "opening"
     concept_name = Column(String(255), nullable=False, index=True)  # e.g., "Pin", "Centralization"
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class StudySession(Base):
@@ -205,7 +204,7 @@ class StudySession(Base):
     games_reviewed = Column(JSON, default=list)  # List of game IDs reviewed in this session
     engine_analysis_count = Column(Integer, nullable=False)  # Number of positions analyzed
     completed_at = Column(DateTime, nullable=True)  # When study session was completed
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationships
     study_plan = relationship("StudyPlan", back_populates="study_sessions")

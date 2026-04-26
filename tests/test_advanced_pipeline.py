@@ -1,5 +1,5 @@
-import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
+
 from src.chess_analyzer.advanced_analysis_pipeline import AdvancedAnalysisPipeline
 
 

@@ -1,4 +1,3 @@
-import pytest
 from src.chess_analyzer.feature_extractor import FeatureExtractor
 
 

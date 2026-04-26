@@ -1,7 +1,7 @@
-from typing import List, Optional
 import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
+
 from src.chess_analyzer.database.models import Position
 
 
@@ -22,7 +22,7 @@ class AnomalyDetector:
         self.scaler = StandardScaler()
         self.is_fitted = False
 
-    def extract_features(self, positions: List[Position]) -> np.ndarray:
+    def extract_features(self, positions: list[Position]) -> np.ndarray:
         """
         Extract features for anomaly detection: [CPL, material_loss, king_exposure, eval_drop]
 
@@ -57,7 +57,7 @@ class AnomalyDetector:
 
         return np.array(features)
 
-    def fit(self, positions: List[Position]) -> None:
+    def fit(self, positions: list[Position]) -> None:
         """
         Learn what 'normal' positions look like
 
@@ -112,7 +112,7 @@ class AnomalyDetector:
         normalized = (1.0 - score) / 2.0
         return float(np.clip(normalized, 0.0, 1.0))
 
-    def get_anomalies(self, positions: List[Position], threshold: float = 0.7) -> List[dict]:
+    def get_anomalies(self, positions: list[Position], threshold: float = 0.7) -> list[dict]:
         """
         Get anomalies above threshold
 

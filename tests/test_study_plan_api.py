@@ -1,7 +1,7 @@
 """Tests for Phase 3 Study Plan REST API endpoints."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,17 +9,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.chess_analyzer.main import app
 from src.chess_analyzer.database.models import (
-    Base,
     ConceptMap,
     Game,
     Pattern,
-    Position,
     StudyPlan,
-    StudySession,
 )
 from src.chess_analyzer.database.session import get_db
+from src.chess_analyzer.main import app
 
 
 @pytest.fixture
@@ -363,7 +360,7 @@ class TestProgressEndpoint:
         # Mark one plan as completed
         test_db.query(StudyPlan).filter(
             StudyPlan.id == sample_study_plans[1].id
-        ).update({"status": "completed", "marked_studied_at": datetime.now(timezone.utc)})
+        ).update({"status": "completed", "marked_studied_at": datetime.now(UTC)})
         test_db.commit()
 
         response = client.get("/api/study-plan/progress?user_id=testplayer")
@@ -416,7 +413,7 @@ class TestGamesEndpoint:
             opponent_username="opponent",
             time_control="blitz",
             result="loss",
-            date=datetime.now(timezone.utc),
+            date=datetime.now(UTC),
             pgn="1. e4 e5",
         )
         test_db.add(game)

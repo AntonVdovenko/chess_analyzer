@@ -1,7 +1,7 @@
 """Concept mapper for mapping chess weaknesses to learning concepts."""
 
 import logging
-from typing import Any, List, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class ConceptMapper:
             "pawn_endgame": {"description": "Pawn-only endgame"}
         }
 
-    def map_weakness(self, pattern: Any) -> List[Dict]:
+    def map_weakness(self, pattern: Any) -> list[dict]:
         """
         Map a chess weakness pattern to relevant learning concepts.
 
@@ -134,9 +134,8 @@ class ConceptMapper:
             else:
                 logger.warning(f"Unknown opening encountered: {opening_name}")
                 concepts.append({"type": "opening", "name": "other"})
-        else:
-            if hasattr(pattern, 'opening'):
-                logger.warning("Pattern has 'opening' attribute but it is None or empty")
+        elif hasattr(pattern, 'opening'):
+            logger.warning("Pattern has 'opening' attribute but it is None or empty")
 
         # 3. Map position type concepts based on endgame_type first (most reliable)
         # Then use CPL heuristic as fallback

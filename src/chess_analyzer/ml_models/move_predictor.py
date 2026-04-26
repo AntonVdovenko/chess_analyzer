@@ -1,5 +1,4 @@
-from typing import List, Dict, Optional
-from src.chess_analyzer.database.models import Game, Position
+from src.chess_analyzer.database.models import Game
 
 
 class MovePredictor:
@@ -13,7 +12,7 @@ class MovePredictor:
         self.min_position_frequency = min_position_frequency
         self.move_distributions = {}  # {position_hash: {move: count}}
 
-    def fit(self, games: List[Game]) -> None:
+    def fit(self, games: list[Game]) -> None:
         """Learn move patterns from player's games"""
         if not games:
             return
@@ -73,7 +72,7 @@ class MovePredictor:
 
         return float(move_count) / total
 
-    def get_unusual_moves(self, game: Game, threshold: float = 0.2) -> List[Dict]:
+    def get_unusual_moves(self, game: Game, threshold: float = 0.2) -> list[dict]:
         """
         Get moves with probability < threshold
 

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { chessAPI } from '../api';
-import { formatPercentage } from '../utils';
+import { formatNumber } from '../utils';
 import PatternFilter from './PatternFilter';
 import PatternList from './PatternList';
 import PatternDetail from './PatternDetail';
@@ -125,7 +125,9 @@ export default function PatternExplorer() {
             <div className="stat-item">
               <span className="stat-label">Overall Accuracy</span>
               <span className="stat-value">
-                {stats.overall_accuracy ? formatPercentage(stats.overall_accuracy, 1) : 'N/A'}
+                {stats.overall_accuracy !== null && stats.overall_accuracy !== undefined
+                  ? `${formatNumber(stats.overall_accuracy, 1)}%`
+                  : 'N/A'}
               </span>
             </div>
             {showAdvanced && (

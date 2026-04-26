@@ -1,19 +1,15 @@
 """Tests for StudyPlanGenerator class."""
 
-import uuid
-from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.chess_analyzer.database.models import (
-    Base,
     ConceptMap,
     Pattern,
     StudyPlan,
-    StudySession,
 )
 from src.chess_analyzer.study_planning.study_plan_generator import StudyPlanGenerator
 
@@ -334,7 +330,6 @@ class TestGenerateStudyPlan:
         self, test_db, sample_patterns
     ):
         """Test generate_study_plan with mocked concept mapper to verify it's called."""
-        from unittest.mock import Mock, patch
 
         generator = StudyPlanGenerator(test_db)
 

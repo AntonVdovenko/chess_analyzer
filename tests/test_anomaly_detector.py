@@ -1,6 +1,5 @@
-import pytest
-import numpy as np
 from unittest.mock import Mock
+
 from src.chess_analyzer.ml_models.anomaly_detector import AnomalyDetector
 
 

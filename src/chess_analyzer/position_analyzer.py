@@ -44,7 +44,7 @@ class PositionAnalyzer:
         Returns:
             Absolute centipawn loss as a float.
         """
-        return abs(eval_before - eval_after)
+        return abs(eval_before - eval_after) * 100.0
 
     def analyze_position(
         self, fen: str, depth: int | None = None, time_limit: float = 1.0
@@ -89,13 +89,17 @@ class PositionAnalyzer:
         """Convert Stockfish evaluation to float (pawns).
 
         Args:
-            score: Stockfish Score object.
+            score: Stockfish Score object or PovScore object.
 
         Returns:
             Evaluation as float in pawns. Mate scores are converted to +/- 10000.
         """
         if score is None:
             return 0.0
+
+        # Handle PovScore by converting to Score object
+        if isinstance(score, chess.engine.PovScore):
+            score = score.relative
 
         if score.is_mate():
             mate_in_n = score.mate()

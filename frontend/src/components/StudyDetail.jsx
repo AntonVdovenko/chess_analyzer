@@ -57,7 +57,7 @@ export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
       </button>
 
       <div className="detail-header">
-        <h2>{plan.weakness_id || 'Weakness Pattern'}</h2>
+        <h2>{plan.weakness_name || plan.weakness_id || 'Weakness Pattern'}</h2>
         <span className="detail-status">{plan.status}</span>
       </div>
 
@@ -71,6 +71,12 @@ export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
               <span className="info-label">Weakness ID</span>
               <span className="info-value">{plan.weakness_id}</span>
             </div>
+            {plan.weakness_type && (
+              <div className="info-row">
+                <span className="info-label">Weakness Type</span>
+                <span className="info-value">{plan.weakness_type}</span>
+              </div>
+            )}
             <div className="info-row">
               <span className="info-label">Priority Score</span>
               <span className="info-value">{formatPercentage(plan.priority_score)}</span>
@@ -118,7 +124,7 @@ export default function StudyDetail({ plan, username, onBack, onMarkStudied }) {
                   <div className="game-stats">
                     <div className="game-stat">
                       <span className="stat-label">Accuracy</span>
-                      <span className="stat-value">{formatPercentage(game.accuracy, 1)}%</span>
+                      <span className="stat-value">{formatNumber(game.accuracy, 1)}%</span>
                     </div>
                     <div className="game-stat">
                       <span className="stat-label">Eval Loss</span>

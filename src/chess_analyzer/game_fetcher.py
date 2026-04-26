@@ -1,6 +1,6 @@
 """Chess.com API integration for fetching player games."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from chessdotcom import ChessDotComClient
 
@@ -8,7 +8,7 @@ from chessdotcom import ChessDotComClient
 class ChessComFetcher:
     """Fetch games from chess.com API."""
 
-    def __init__(self, user_agent: str = None):
+    def __init__(self, user_agent: str | None = None):
         """Initialize the Chess.com fetcher.
 
         Args:
@@ -98,7 +98,9 @@ class ChessComFetcher:
             "result": result_normalized,
             "time_control": game.time_control,
             "time_class": game.time_class or self._infer_time_class(game.time_control),
-            "date": datetime.fromtimestamp(game.end_time) if game.end_time else None,
+            "date": datetime.fromtimestamp(game.end_time, tz=UTC)
+            if game.end_time
+            else None,
             "opponent": opponent,
             "opponent_elo": (
                 game.black.rating if is_white else game.white.rating
@@ -124,6 +126,11 @@ class ChessComFetcher:
             "abandoned": "abandoned",
             "repetition": "draw",
             "agreed": "draw",
+            "resigned": "loss",
+            "stalemate": "draw",
+            "insufficient": "draw",
+            "50move": "draw",
+            "timevsinsufficient": "draw",
         }
 
         normalized = result_map.get(result, result)

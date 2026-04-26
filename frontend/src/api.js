@@ -33,8 +33,8 @@ export const chessAPI = {
   getPatterns: (username, weaknessType = null) =>
     apiCall(`/patterns?username=${username}${weaknessType ? `&weakness_type=${weaknessType}` : ''}`),
 
-  getStudyPlan: (username) =>
-    apiCall(`/study-plan?username=${username}`),
+  getStudyPlan: (userId) =>
+    apiCall(`/study-plan?user_id=${userId}`),
 
   // Phase 2 API methods
   startAdvancedAnalysis: async (username, gameLimit = 100) => {
@@ -91,10 +91,9 @@ export const chessAPI = {
     return response.json();
   },
 
-  getStudyPlans: async (username, filters = {}) => {
-    const params = new URLSearchParams({ user_id: username });
-    if (filters.status) params.append('status', filters.status);
-    if (filters.concept_type) params.append('concept_type', filters.concept_type);
+  getStudyPlans: async (userId, filters = {}) => {
+    const params = new URLSearchParams({ user_id: userId });
+    if (filters.status && filters.status !== 'all') params.append('status', filters.status);
     if (filters.sort_by) params.append('sort_by', filters.sort_by);
 
     const response = await fetch(`${BASE_URL}/study-plan?${params}`);
@@ -102,21 +101,18 @@ export const chessAPI = {
     return response.json();
   },
 
-  markWeaknessStudied: async (planId, gamesReviewed = 0, engineAnalysisCount = 0) => {
+  markWeaknessStudied: async (planId) => {
     const response = await fetch(`${BASE_URL}/study-plan/${planId}/mark-studied`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        games_reviewed: gamesReviewed,
-        engine_analysis_count: engineAnalysisCount,
-      }),
+      body: JSON.stringify({}),
     });
     if (!response.ok) throw new Error(`Failed to mark weakness as studied: ${response.statusText}`);
     return response.json();
   },
 
-  getStudyProgress: async (username) => {
-    const params = new URLSearchParams({ user_id: username });
+  getStudyProgress: async (userId) => {
+    const params = new URLSearchParams({ user_id: userId });
     const response = await fetch(`${BASE_URL}/study-plan/progress?${params}`);
     if (!response.ok) throw new Error(`Failed to get study progress: ${response.statusText}`);
     return response.json();

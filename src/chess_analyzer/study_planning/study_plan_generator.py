@@ -1,7 +1,7 @@
 """Study plan generator for creating personalized study plans from weakness patterns."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -65,7 +65,7 @@ class StudyPlanGenerator:
 
     def generate_study_plan(
         self, username: str, game_limit: int = 100
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a personalized study plan for a player.
 
         Retrieves all weakness patterns for a player, calculates priority scores
@@ -88,12 +88,10 @@ class StudyPlanGenerator:
                 }
             }
         """
+        _ = game_limit
+
         # Get all patterns for this user
-        patterns = (
-            self.db_session.query(Pattern)
-            .filter(Pattern.player_username == username)
-            .all()
-        )
+        patterns = self.db_session.query(Pattern).filter(Pattern.player_username == username).all()
 
         if not patterns:
             return {
@@ -103,7 +101,9 @@ class StudyPlanGenerator:
                 "priority_distribution": {"high": 0, "medium": 0, "low": 0},
             }
 
-        # Calculate priority scores
+        pattern_ids = [pattern.id for pattern in patterns]
+        self._clear_existing_study_plan_data(username, pattern_ids)
+
         priority_scores = self._calculate_priority_scores(patterns)
 
         # Track distribution
@@ -151,7 +151,7 @@ class StudyPlanGenerator:
         }
 
     @staticmethod
-    def _calculate_priority_scores(patterns: List[Pattern]) -> List[float]:
+    def _calculate_priority_scores(patterns: list[Pattern]) -> list[float]:
         """Calculate priority scores for patterns based on frequency.
 
         Normalizes pattern frequencies to a 0-1 scale, with the highest
@@ -194,3 +194,32 @@ class StudyPlanGenerator:
             return "medium"
         else:
             return "low"
+
+    def _clear_existing_study_plan_data(
+        self,
+        username: str,
+        pattern_ids: list[int],
+    ) -> None:
+        """Delete existing study plans and mapped concepts before regeneration."""
+        # First delete study sessions (they reference study_plans via FK)
+        study_plan_ids = [
+            sp.id for sp in self.db_session.query(StudyPlan).filter(
+                StudyPlan.user_id == username
+            ).all()
+        ]
+        if study_plan_ids:
+            from src.chess_analyzer.database.models import StudySession
+            self.db_session.query(StudySession).filter(
+                StudySession.study_plan_id.in_(study_plan_ids)
+            ).delete(synchronize_session=False)
+
+        # Then delete study plans
+        self.db_session.query(StudyPlan).filter(StudyPlan.user_id == username).delete(
+            synchronize_session=False
+        )
+        # Finally delete concept maps
+        if pattern_ids:
+            self.db_session.query(ConceptMap).filter(
+                ConceptMap.weakness_id.in_(pattern_ids)
+            ).delete(synchronize_session=False)
+        self.db_session.flush()

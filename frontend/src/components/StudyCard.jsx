@@ -23,7 +23,7 @@ export default function StudyCard({ plan, onExpand }) {
   return (
     <div className="study-card">
       <div className="study-card-header">
-        <h3>{plan.weakness_id || 'Weakness Pattern'}</h3>
+        <h3>{plan.weakness_name || plan.weakness_id || 'Weakness Pattern'}</h3>
         <span
           className="priority-badge"
           style={{
@@ -44,6 +44,13 @@ export default function StudyCard({ plan, onExpand }) {
           <span className="stat-label">Status</span>
           <span className="stat-value">{plan.status}</span>
         </div>
+
+        {plan.weakness_type && (
+          <div className="study-card-stat">
+            <span className="stat-label">Type</span>
+            <span className="stat-value">{plan.weakness_type}</span>
+          </div>
+        )}
 
         <div className="study-card-stat">
           <span className="stat-label">Related Concepts</span>

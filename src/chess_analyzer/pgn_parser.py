@@ -1,12 +1,12 @@
-import chess.pgn
 from io import StringIO
-from typing import Dict, List
+
+import chess.pgn
 
 
 class PGNParser:
     """Parse PGN files and extract positions."""
 
-    def parse_pgn(self, pgn_string: str) -> Dict:
+    def parse_pgn(self, pgn_string: str) -> dict:
         """Parse a PGN string and extract moves and positions."""
         game = chess.pgn.read_game(StringIO(pgn_string))
 
@@ -16,10 +16,7 @@ class PGNParser:
         headers = game.headers
         moves_with_positions = []
         board = game.board()
-        move_number = 0
-
-        for move in game.mainline_moves():
-            move_number += 1
+        for move_number, move in enumerate(game.mainline_moves(), start=1):
 
             fen_before = board.fen()
             eval_before = None
