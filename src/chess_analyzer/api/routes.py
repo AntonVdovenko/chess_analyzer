@@ -11,9 +11,9 @@ import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from src.chess_analyzer.advanced_analysis_pipeline import AdvancedAnalysisPipeline
-from src.chess_analyzer.analysis_pipeline import AnalysisPipeline
-from src.chess_analyzer.api.schemas import (
+from chess_analyzer.advanced_analysis_pipeline import AdvancedAnalysisPipeline
+from chess_analyzer.analysis_pipeline import AnalysisPipeline
+from chess_analyzer.api.schemas import (
     AdvancedAnalysisRequest,
     AdvancedAnalysisResponse,
     AdvancedAnalysisStatusResponse,
@@ -35,7 +35,7 @@ from src.chess_analyzer.api.schemas import (
     StudyPlanResponse,
     StudyProgressResponse,
 )
-from src.chess_analyzer.database.models import (
+from chess_analyzer.database.models import (
     AdvancedAnalysisJob,
     Anomaly,
     ConceptMap,
@@ -48,10 +48,10 @@ from src.chess_analyzer.database.models import (
     StudyPlan,
     StudySession,
 )
-from src.chess_analyzer.database.session import get_db
-from src.chess_analyzer.game_fetcher import ChessComFetcher
-from src.chess_analyzer.ml_models.embeddings import PositionEmbedder
-from src.chess_analyzer.study_planning.study_plan_generator import StudyPlanGenerator
+from chess_analyzer.database.session import get_db
+from chess_analyzer.game_fetcher import ChessComFetcher
+from chess_analyzer.ml_models.embeddings import PositionEmbedder
+from chess_analyzer.study_planning.study_plan_generator import StudyPlanGenerator
 
 router = APIRouter()
 

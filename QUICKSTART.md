@@ -6,6 +6,7 @@ Get the chess analyzer running in 5 minutes.
 
 - **PostgreSQL 15+** (or Docker)
 - **Python 3.12+**
+  - CI currently tests supported Python minors 3.12, 3.13, and 3.14.
 - **Node.js 18+** with npm
 - **Stockfish** chess engine installed (optional for now)
 
@@ -35,10 +36,10 @@ docker run -d --name chess-db \
 cd /Users/User/Workspace/Python/chess_analyzer
 
 # Option A: Using UV (fast)
-uv run python -m uvicorn src.chess_analyzer.main:app --reload
+uv run python -m uvicorn chess_analyzer.main:app --reload
 
 # Option B: Using pip
-python -m uvicorn src.chess_analyzer.main:app --reload
+python -m uvicorn chess_analyzer.main:app --reload
 ```
 
 ✅ Backend ready at: `http://localhost:8000`  

@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.chess_analyzer.database.models import (
+from chess_analyzer.database.models import (
     ConceptMap,
     Pattern,
     StudyPlan,

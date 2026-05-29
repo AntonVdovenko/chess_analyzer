@@ -405,7 +405,7 @@ CHESS_API_KEY=(auto-fetched from chess.com)
 ### Startup Commands
 ```bash
 # Backend
-python -m uvicorn src.chess_analyzer.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn chess_analyzer.main:app --host 0.0.0.0 --port 8000
 
 # Frontend
 cd frontend && npm run build && serve -s build

@@ -5,8 +5,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from src.chess_analyzer.database.models import ConceptMap, Pattern, StudyPlan
-from src.chess_analyzer.study_planning.concept_mapper import ConceptMapper
+from chess_analyzer.database.models import ConceptMap, Pattern, StudyPlan
+from chess_analyzer.study_planning.concept_mapper import ConceptMapper
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +201,7 @@ class StudyPlanGenerator:
             for sp in self.db_session.query(StudyPlan).filter(StudyPlan.user_id == username).all()
         ]
         if study_plan_ids:
-            from src.chess_analyzer.database.models import StudySession
+            from chess_analyzer.database.models import StudySession
 
             self.db_session.query(StudySession).filter(
                 StudySession.study_plan_id.in_(study_plan_ids)

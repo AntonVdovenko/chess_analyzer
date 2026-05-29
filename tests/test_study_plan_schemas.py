@@ -6,7 +6,7 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from src.chess_analyzer.api.schemas import (
+from chess_analyzer.api.schemas import (
     ConceptListResponse,
     MarkStudiedRequest,
     MarkStudiedResponse,

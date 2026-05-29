@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-from src.chess_analyzer.feature_extractor import FeatureExtractor
+from chess_analyzer.feature_extractor import FeatureExtractor
 
 
 class PositionEmbedder:

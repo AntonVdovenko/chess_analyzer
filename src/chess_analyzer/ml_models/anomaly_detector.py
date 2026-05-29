@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
-from src.chess_analyzer.database.models import Position
+from chess_analyzer.database.models import Position
 
 
 class AnomalyDetector:

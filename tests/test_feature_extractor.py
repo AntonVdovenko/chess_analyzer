@@ -1,4 +1,4 @@
-from src.chess_analyzer.feature_extractor import FeatureExtractor
+from chess_analyzer.feature_extractor import FeatureExtractor
 
 
 def test_extract_material_balance():

@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock
 
-from src.chess_analyzer.study_planning.concept_mapper import ConceptMapper
+from chess_analyzer.study_planning.concept_mapper import ConceptMapper
 
 
 def test_concept_mapper_init():

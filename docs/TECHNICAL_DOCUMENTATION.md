@@ -114,7 +114,7 @@
 
 **Example Usage**:
 ```python
-from src.chess_analyzer.chess_analyzer.game_fetcher import ChessComFetcher
+from chess_analyzer.game_fetcher import ChessComFetcher
 
 fetcher = ChessComFetcher()
 games = fetcher.fetch_games("hikaru", limit=100)
@@ -145,7 +145,7 @@ games = fetcher.fetch_games("hikaru", limit=100)
 
 **Example Usage**:
 ```python
-from src.chess_analyzer.chess_analyzer.pgn_parser import PGNParser
+from chess_analyzer.pgn_parser import PGNParser
 
 parser = PGNParser()
 result = parser.parse_pgn(pgn_string)
@@ -186,7 +186,7 @@ print(result['positions'])  # List of FEN strings
 
 **Example Usage**:
 ```python
-from src.chess_analyzer.chess_analyzer.position_analyzer import PositionAnalyzer
+from chess_analyzer.position_analyzer import PositionAnalyzer
 
 analyzer = PositionAnalyzer()
 eval_score = analyzer.evaluate_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
@@ -220,7 +220,7 @@ loss = analyzer.calculate_move_loss(fen, "e2e4", best_eval)
 
 **Example Usage**:
 ```python
-from src.chess_analyzer.chess_analyzer.feature_extractor import FeatureExtractor
+from chess_analyzer.feature_extractor import FeatureExtractor
 
 extractor = FeatureExtractor()
 features = extractor.extract_features(fen)
@@ -265,7 +265,7 @@ features = extractor.extract_features(fen)
 
 **Example Usage**:
 ```python
-from src.chess_analyzer.chess_analyzer.ml_models.clustering import WeaknessClustering
+from chess_analyzer.ml_models.clustering import WeaknessClustering
 
 clusterer = WeaknessClustering()
 clusters = clusterer.fit_clusters(feature_matrix)
@@ -317,7 +317,7 @@ labels = clusterer.generate_labels(feature_matrix, clusters)
 
 **Example Usage**:
 ```python
-from src.chess_analyzer.chess_analyzer.analysis_pipeline import AnalysisPipeline
+from chess_analyzer.analysis_pipeline import AnalysisPipeline
 
 pipeline = AnalysisPipeline()
 result = pipeline.analyze_player("hikaru", game_limit=50)
@@ -856,12 +856,12 @@ docker run -d --name chess-db \
 
 **6. Initialize database**:
 ```bash
-python -c "from src.chess_analyzer.database.models import Base; from src.chess_analyzer.database.session import engine; Base.metadata.create_all(engine)"
+python -c "from chess_analyzer.database.models import Base; from chess_analyzer.database.session import engine; Base.metadata.create_all(engine)"
 ```
 
 **7. Start backend**:
 ```bash
-python -m uvicorn src.chess_analyzer.main:app --reload
+python -m uvicorn chess_analyzer.main:app --reload
 ```
 
 **8. Start frontend** (new terminal):
@@ -889,7 +889,7 @@ npm run build
 
 **Run backend**:
 ```bash
-python -m uvicorn src.chess_analyzer.main:app \
+python -m uvicorn chess_analyzer.main:app \
   --host 0.0.0.0 \
   --port 8000 \
   --workers 4
@@ -1075,7 +1075,7 @@ pytest tests/test_game_fetcher.py::test_fetch_games -v
 
 ### Backend Won't Start
 
-**Error**: `ModuleNotFoundError: No module named 'src.chess_analyzer'`
+**Error**: `ModuleNotFoundError: No module named 'chess_analyzer'`
 
 **Solution**:
 ```bash

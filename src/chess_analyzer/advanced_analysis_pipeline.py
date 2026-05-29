@@ -7,16 +7,16 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from src.chess_analyzer.database.models import (
+from chess_analyzer.database.models import (
     Anomaly,
     Embedding,
     Game,
     MovePrediction,
     Position,
 )
-from src.chess_analyzer.ml_models.anomaly_detector import AnomalyDetector
-from src.chess_analyzer.ml_models.embeddings import PositionEmbedder
-from src.chess_analyzer.ml_models.move_predictor import MovePredictor
+from chess_analyzer.ml_models.anomaly_detector import AnomalyDetector
+from chess_analyzer.ml_models.embeddings import PositionEmbedder
+from chess_analyzer.ml_models.move_predictor import MovePredictor
 
 logger = logging.getLogger(__name__)
 

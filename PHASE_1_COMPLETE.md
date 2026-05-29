@@ -146,10 +146,10 @@ docker run -d --name chess-db \
 cd /Users/User/Workspace/Python/chess_analyzer
 
 # Option A: UV (fast Python package manager)
-uv run python -m uvicorn src.chess_analyzer.main:app --reload
+uv run python -m uvicorn chess_analyzer.main:app --reload
 
 # Option B: Standard pip
-python -m uvicorn src.chess_analyzer.main:app --reload
+python -m uvicorn chess_analyzer.main:app --reload
 ```
 
 Expected: Server runs at `http://localhost:8000`  

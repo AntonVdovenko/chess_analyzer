@@ -20,7 +20,7 @@ docker run -d --name chess-db \
   -e POSTGRES_DB=chess_analyzer -p 5432:5432 postgres:15
 
 # 2. Start backend (Terminal 1)
-python -m uvicorn src.chess_analyzer.main:app --reload
+python -m uvicorn chess_analyzer.main:app --reload
 
 # 3. Start frontend (Terminal 2)
 cd frontend && npm start
@@ -215,7 +215,7 @@ ruff format src/ tests/
 
 ```bash
 # Backend
-python -m uvicorn src.chess_analyzer.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn chess_analyzer.main:app --host 0.0.0.0 --port 8000
 
 # Frontend
 cd frontend && npm run build

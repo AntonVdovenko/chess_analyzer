@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.chess_analyzer.ml_models.clustering import WeaknessClustering
+from chess_analyzer.ml_models.clustering import WeaknessClustering
 
 
 def test_kmeans_clustering():

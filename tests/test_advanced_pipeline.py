@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from src.chess_analyzer.advanced_analysis_pipeline import AdvancedAnalysisPipeline
+from chess_analyzer.advanced_analysis_pipeline import AdvancedAnalysisPipeline
 
 
 def test_advanced_pipeline_init():
