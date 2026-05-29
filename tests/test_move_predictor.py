@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from src.chess_analyzer.ml_models.move_predictor import MovePredictor
+from chess_analyzer.ml_models.move_predictor import MovePredictor
 
 
 def test_move_predictor_init():

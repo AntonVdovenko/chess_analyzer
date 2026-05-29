@@ -5,7 +5,7 @@ import logging
 import chess
 import chess.engine
 
-from src.chess_analyzer.config import settings
+from chess_analyzer.config import settings
 
 logger = logging.getLogger(__name__)
 

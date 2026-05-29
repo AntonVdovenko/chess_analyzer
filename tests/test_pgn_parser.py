@@ -1,4 +1,4 @@
-from src.chess_analyzer.pgn_parser import PGNParser
+from chess_analyzer.pgn_parser import PGNParser
 
 
 def test_parse_pgn_returns_moves():

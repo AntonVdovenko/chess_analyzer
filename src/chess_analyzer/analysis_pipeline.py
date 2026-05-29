@@ -8,10 +8,10 @@ from typing import Any
 
 import numpy as np
 
-from src.chess_analyzer.feature_extractor import FeatureExtractor
-from src.chess_analyzer.ml_models.clustering import WeaknessClustering
-from src.chess_analyzer.pgn_parser import PGNParser
-from src.chess_analyzer.position_analyzer import PositionAnalyzer
+from chess_analyzer.feature_extractor import FeatureExtractor
+from chess_analyzer.ml_models.clustering import WeaknessClustering
+from chess_analyzer.pgn_parser import PGNParser
+from chess_analyzer.position_analyzer import PositionAnalyzer
 
 logger = logging.getLogger(__name__)
 

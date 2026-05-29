@@ -6,7 +6,7 @@ from unittest.mock import call, patch
 
 import pytest
 
-from src.chess_analyzer.game_fetcher import ChessComFetcher
+from chess_analyzer.game_fetcher import ChessComFetcher
 
 
 def make_player(username: str, rating: int, result: str) -> SimpleNamespace:
@@ -43,7 +43,7 @@ def make_game(
 @pytest.fixture
 def mock_chessdotcom_client():
     """Patch the chess.com client so tests never touch the network."""
-    with patch("src.chess_analyzer.game_fetcher.ChessDotComClient") as client_cls:
+    with patch("chess_analyzer.game_fetcher.ChessDotComClient") as client_cls:
         yield client_cls.return_value
 
 

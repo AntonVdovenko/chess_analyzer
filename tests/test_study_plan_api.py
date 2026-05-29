@@ -9,14 +9,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.chess_analyzer.database.models import (
+from chess_analyzer.database.models import (
     ConceptMap,
     Game,
     Pattern,
     StudyPlan,
 )
-from src.chess_analyzer.database.session import get_db
-from src.chess_analyzer.main import app
+from chess_analyzer.database.session import get_db
+from chess_analyzer.main import app
 
 
 @pytest.fixture

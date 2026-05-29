@@ -1,4 +1,4 @@
-from src.chess_analyzer.database.models import Game
+from chess_analyzer.database.models import Game
 
 
 class MovePredictor:

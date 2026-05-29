@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 import numpy as np
 
-from src.chess_analyzer.ml_models.embeddings import PositionEmbedder
+from chess_analyzer.ml_models.embeddings import PositionEmbedder
 
 
 def test_position_embedder_init():

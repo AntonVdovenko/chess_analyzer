@@ -6,13 +6,13 @@ import chess
 import chess.engine
 import pytest
 
-from src.chess_analyzer.position_analyzer import PositionAnalyzer
+from chess_analyzer.position_analyzer import PositionAnalyzer
 
 
 @pytest.fixture
 def analyzer_with_mock_engine():
     """Create analyzer with mocked engine."""
-    with patch("src.chess_analyzer.position_analyzer.chess.engine.SimpleEngine.popen_uci"):
+    with patch("chess_analyzer.position_analyzer.chess.engine.SimpleEngine.popen_uci"):
         analyzer = PositionAnalyzer(stockfish_path="/mock/stockfish")
         analyzer.engine = Mock()
         yield analyzer

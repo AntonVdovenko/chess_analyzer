@@ -3,8 +3,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.chess_analyzer.api.routes import router as api_router
-from src.chess_analyzer.config import settings
+from chess_analyzer.api.routes import router as api_router
+from chess_analyzer.config import settings
 
 app = FastAPI(
     title="Chess Analyzer",

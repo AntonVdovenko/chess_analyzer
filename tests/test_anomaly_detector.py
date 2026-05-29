@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from src.chess_analyzer.ml_models.anomaly_detector import AnomalyDetector
+from chess_analyzer.ml_models.anomaly_detector import AnomalyDetector
 
 
 def test_anomaly_detector_init():
