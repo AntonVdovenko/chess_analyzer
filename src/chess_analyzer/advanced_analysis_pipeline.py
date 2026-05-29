@@ -141,16 +141,16 @@ class AdvancedAnalysisPipeline:
     ) -> None:
         """Delete prior advanced-analysis artifacts for the same games."""
         if game_ids:
-            self.session.query(MovePrediction).filter(
-                MovePrediction.game_id.in_(game_ids)
-            ).delete(synchronize_session=False)
-            self.session.query(Anomaly).filter(
-                Anomaly.game_id.in_(game_ids)
-            ).delete(synchronize_session=False)
+            self.session.query(MovePrediction).filter(MovePrediction.game_id.in_(game_ids)).delete(
+                synchronize_session=False
+            )
+            self.session.query(Anomaly).filter(Anomaly.game_id.in_(game_ids)).delete(
+                synchronize_session=False
+            )
         if position_ids:
-            self.session.query(Embedding).filter(
-                Embedding.position_id.in_(position_ids)
-            ).delete(synchronize_session=False)
+            self.session.query(Embedding).filter(Embedding.position_id.in_(position_ids)).delete(
+                synchronize_session=False
+            )
         self.session.flush()
 
     @staticmethod

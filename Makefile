@@ -7,6 +7,12 @@ init_project:
 python_src:
 	export PYTHONPATH=$(PWD)
 
+verify:
+	uv run ruff check src tests
+	uv run ruff format --check src tests
+	uv run pytest tests -q
+	cd frontend && CI=true npm test -- --watchAll=false
+
 ## Delete all compiled Python files
 clean:
 	find . -type f -name "*.py[co]" -delete

@@ -60,11 +60,13 @@ class AnalysisPipeline:
                         fen_before,
                         depth=15,
                         time_limit=0.5,
+                        perspective=player_color,
                     )
                     analysis_after = self.position_analyzer.analyze_position(
                         fen_after,
                         depth=15,
                         time_limit=0.5,
+                        perspective=player_color,
                     )
                 except Exception as exc:
                     logger.warning("Error analyzing position %s: %s", pos_idx, exc)

@@ -177,12 +177,12 @@ See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions.
 - **GET** `/api/pattern-details/{pattern_id}` - Pattern details with Phase 2 data
 
 ### Phase 3: Study Planning
-- **POST** `/api/study-plans/generate` - Generate personalized study plan
-- **GET** `/api/study-plans` - List study plans with filters
-- **POST** `/api/study-plans/{plan_id}/mark-studied` - Mark weakness as studied
-- **GET** `/api/study-plans/progress` - Get overall progress metrics
-- **GET** `/api/study-plans/{plan_id}/concepts` - Get learning concepts
-- **GET** `/api/study-plans/{plan_id}/games` - Get games for weakness study
+- **POST** `/api/study-plan/generate` - Generate personalized study plan
+- **GET** `/api/study-plan` - List study plans with filters
+- **PATCH** `/api/study-plan/{plan_id}/mark-studied` - Mark weakness as studied
+- **GET** `/api/study-plan/progress` - Get overall progress metrics
+- **GET** `/api/study-plan/{plan_id}/concepts` - Get learning concepts
+- **GET** `/api/study-plan/{plan_id}/games` - Get games for weakness study
 
 See `src/chess_analyzer/api/routes.py` for implementation.
 
@@ -221,10 +221,10 @@ python -m uvicorn src.chess_analyzer.main:app --host 0.0.0.0 --port 8000
 cd frontend && npm run build
 ```
 
-### Docker (Coming in Phase 2)
+### Docker Base Image
 
 ```bash
-docker-compose up -d
+docker build -f Dockerfile.base -t chess-analyzer-base .
 ```
 
 ---

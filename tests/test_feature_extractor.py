@@ -23,7 +23,7 @@ def test_extract_all_features():
     fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
     features = extractor.extract_all_features(fen)
 
-    assert 'material_balance' in features
-    assert 'piece_activity' in features
-    assert 'king_safety' in features
-    assert isinstance(features['material_balance'], (int, float))
+    assert "material_balance" in features
+    assert "piece_activity" in features
+    assert "king_safety" in features
+    assert isinstance(features["material_balance"], (int, float))

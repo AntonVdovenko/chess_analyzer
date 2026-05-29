@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "chess-analyzer"
 dynamic = ["version"]
-description = "Per project to analaze player chess history on chess.com and come up with er chess skills"
+description = "Analyze a player's chess.com history and identify chess skill weaknesses"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

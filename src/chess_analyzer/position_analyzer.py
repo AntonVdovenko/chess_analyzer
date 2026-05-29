@@ -34,20 +34,25 @@ class PositionAnalyzer:
     def calculate_centipawn_loss(self, eval_before: float, eval_after: float) -> float:
         """Calculate centipawn loss for a move.
 
-        Centipawn loss is the absolute difference between the evaluation before
-        and after a move, measured in centipawns (hundredths of a pawn).
+        Centipawn loss is the decline in evaluation after a move, measured in
+        centipawns (hundredths of a pawn). If a move improves the player's
+        evaluation, it has no centipawn loss.
 
         Args:
             eval_before: Evaluation before the move (in pawns).
             eval_after: Evaluation after the move (in pawns).
 
         Returns:
-            Absolute centipawn loss as a float.
+            Centipawn loss as a float.
         """
-        return abs(eval_before - eval_after) * 100.0
+        return max(0.0, eval_before - eval_after) * 100.0
 
     def analyze_position(
-        self, fen: str, depth: int | None = None, time_limit: float = 1.0
+        self,
+        fen: str,
+        depth: int | None = None,
+        time_limit: float = 1.0,
+        perspective: str | chess.Color | None = None,
     ) -> dict:
         """Analyze a position using Stockfish.
 
@@ -55,6 +60,8 @@ class PositionAnalyzer:
             fen: FEN string representing the position.
             depth: Analysis depth (optional, uses time_limit if not set).
             time_limit: Time limit in seconds for analysis (default 1.0).
+            perspective: Optional side ("white"/"black" or chess.WHITE/chess.BLACK)
+                to evaluate from. Defaults to Stockfish's side-to-move perspective.
 
         Returns:
             Dictionary with keys:
@@ -74,7 +81,7 @@ class PositionAnalyzer:
 
             best_move = info.get("pv")
             best_move_uci = best_move[0].uci() if best_move else None
-            evaluation = self._evaluation_to_float(info.get("score"))
+            evaluation = self._evaluation_to_float(info.get("score"), perspective)
 
             return {
                 "best_move": best_move_uci,
@@ -85,11 +92,16 @@ class PositionAnalyzer:
             logger.error(f"Error analyzing position: {e}")
             raise
 
-    def _evaluation_to_float(self, score: chess.engine.Score | None) -> float:
+    def _evaluation_to_float(
+        self,
+        score: chess.engine.Score | None,
+        perspective: str | chess.Color | None = None,
+    ) -> float:
         """Convert Stockfish evaluation to float (pawns).
 
         Args:
             score: Stockfish Score object or PovScore object.
+            perspective: Optional side to evaluate from when score is a PovScore.
 
         Returns:
             Evaluation as float in pawns. Mate scores are converted to +/- 10000.
@@ -99,20 +111,40 @@ class PositionAnalyzer:
 
         # Handle PovScore by converting to Score object
         if isinstance(score, chess.engine.PovScore):
-            score = score.relative
+            normalized_perspective = self._normalize_perspective(perspective)
+            score = (
+                score.pov(normalized_perspective)
+                if normalized_perspective is not None
+                else score.relative
+            )
 
         if score.is_mate():
             mate_in_n = score.mate()
+            if mate_in_n is None:
+                return 0.0
             return 10000.0 if mate_in_n > 0 else -10000.0
 
         # Convert centipawns to pawns
         return float(score.cp) / 100.0
 
+    @staticmethod
+    def _normalize_perspective(perspective: str | chess.Color | None) -> chess.Color | None:
+        """Normalize a color label into python-chess's color constants."""
+        if perspective is None:
+            return None
+        if isinstance(perspective, str):
+            color = perspective.lower()
+            if color in {"white", "w"}:
+                return chess.WHITE
+            if color in {"black", "b"}:
+                return chess.BLACK
+            raise ValueError(f"Invalid evaluation perspective: {perspective}")
+        return perspective
+
     def get_acpl(self, positions: list[dict]) -> float:
         """Calculate ACPL (Average Centipawn Loss) for a game.
 
-        ACPL is the average absolute difference between evaluation before
-        and after each move in a game.
+        ACPL is the average evaluation decline after each move in a game.
 
         Args:
             positions: List of dicts with 'eval_before' and 'eval_after' keys.

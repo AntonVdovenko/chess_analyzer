@@ -13,10 +13,10 @@ def test_parse_pgn_returns_moves():
 
     result = parser.parse_pgn(pgn_string)
 
-    assert 'moves' in result
-    assert len(result['moves']) > 0
-    assert all('move' in m for m in result['moves'])
-    assert all('fen' in m for m in result['moves'])
+    assert "moves" in result
+    assert len(result["moves"]) > 0
+    assert all("move" in m for m in result["moves"])
+    assert all("fen" in m for m in result["moves"])
 
 
 def test_parse_pgn_extracts_metadata():
@@ -31,6 +31,6 @@ def test_parse_pgn_extracts_metadata():
 
     result = parser.parse_pgn(pgn_string)
 
-    assert result['white'] == "Player1"
-    assert result['black'] == "Player2"
-    assert result['result'] == "0-1"
+    assert result["white"] == "Player1"
+    assert result["black"] == "Player2"
+    assert result["result"] == "0-1"

@@ -97,7 +97,9 @@ class Stats(Base):
     accuracy_by_phase = Column(JSON)
     win_loss_ratio = Column(Float)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
 
 class MovePrediction(Base):
@@ -171,15 +173,21 @@ class StudyPlan(Base):
     id = Column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(String(255), nullable=False, index=True)  # User identifier for access control
     weakness_id = Column(Integer, ForeignKey("patterns.id"), nullable=False)
-    priority_score = Column(Float, nullable=False, index=True)  # Score from 0-1 indicating urgency (normalized frequency)
+    priority_score = Column(
+        Float, nullable=False, index=True
+    )  # Score from 0-1 indicating urgency (normalized frequency)
     status = Column(String(50), nullable=False, index=True)  # "active", "completed", "paused"
     marked_studied_at = Column(DateTime, nullable=True)  # When user marked pattern as studied
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
     # Relationships
     weakness = relationship("Pattern", back_populates="study_plans", foreign_keys=[weakness_id])
-    study_sessions = relationship("StudySession", back_populates="study_plan", cascade="all, delete-orphan")
+    study_sessions = relationship(
+        "StudySession", back_populates="study_plan", cascade="all, delete-orphan"
+    )
 
 
 class ConceptMap(Base):
@@ -200,7 +208,9 @@ class StudySession(Base):
     __tablename__ = "study_sessions"
 
     id = Column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    study_plan_id = Column(postgresql.UUID(as_uuid=True), ForeignKey("study_plans.id"), nullable=False, index=True)
+    study_plan_id = Column(
+        postgresql.UUID(as_uuid=True), ForeignKey("study_plans.id"), nullable=False, index=True
+    )
     games_reviewed = Column(JSON, default=list)  # List of game IDs reviewed in this session
     engine_analysis_count = Column(Integer, nullable=False)  # Number of positions analyzed
     completed_at = Column(DateTime, nullable=True)  # When study session was completed

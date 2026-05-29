@@ -19,11 +19,11 @@ class MovePredictor:
 
         # Extract positions and moves
         for game in games:
-            if not hasattr(game, 'positions') or not game.positions:
+            if not hasattr(game, "positions") or not game.positions:
                 continue
 
             for position in game.positions:
-                if not hasattr(position, 'fen') or not hasattr(position, 'player_move'):
+                if not hasattr(position, "fen") or not hasattr(position, "player_move"):
                     continue
 
                 # Create position hash (using FEN as key)
@@ -85,11 +85,11 @@ class MovePredictor:
         """
         unusual = []
 
-        if not hasattr(game, 'positions') or not game.positions:
+        if not hasattr(game, "positions") or not game.positions:
             return unusual
 
         for i, position in enumerate(game.positions):
-            if not hasattr(position, 'player_move') or not position.player_move:
+            if not hasattr(position, "player_move") or not position.player_move:
                 continue
 
             prob = self.predict(position.fen, position.player_move)
@@ -99,18 +99,18 @@ class MovePredictor:
                 if position.fen in self.move_distributions:
                     moves_dict = self.move_distributions[position.fen]
                     expected_moves = sorted(
-                        moves_dict.keys(),
-                        key=lambda m: moves_dict[m],
-                        reverse=True
+                        moves_dict.keys(), key=lambda m: moves_dict[m], reverse=True
                     )[:3]  # Top 3 expected moves
                 else:
                     expected_moves = []
 
-                unusual.append({
-                    "move_number": i + 1,
-                    "move": position.player_move,
-                    "probability": prob,
-                    "expected_moves": expected_moves
-                })
+                unusual.append(
+                    {
+                        "move_number": i + 1,
+                        "move": position.player_move,
+                        "probability": prob,
+                        "expected_moves": expected_moves,
+                    }
+                )
 
         return unusual

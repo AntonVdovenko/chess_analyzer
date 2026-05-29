@@ -30,9 +30,7 @@ class PatternAdapter:
     @property
     def opening(self) -> str:
         """Get opening name (from features if available)."""
-        if self.pattern.position_features and isinstance(
-            self.pattern.position_features, dict
-        ):
+        if self.pattern.position_features and isinstance(self.pattern.position_features, dict):
             return self.pattern.position_features.get("opening")
         return None
 
@@ -44,9 +42,7 @@ class PatternAdapter:
     @property
     def endgame_type(self) -> str:
         """Get endgame type (from features if available)."""
-        if self.pattern.position_features and isinstance(
-            self.pattern.position_features, dict
-        ):
+        if self.pattern.position_features and isinstance(self.pattern.position_features, dict):
             return self.pattern.position_features.get("endgame_type")
         return None
 
@@ -63,9 +59,7 @@ class StudyPlanGenerator:
         self.db_session = db_session
         self.concept_mapper = ConceptMapper()
 
-    def generate_study_plan(
-        self, username: str, game_limit: int = 100
-    ) -> dict[str, Any]:
+    def generate_study_plan(self, username: str, game_limit: int = 100) -> dict[str, Any]:
         """Generate a personalized study plan for a player.
 
         Retrieves all weakness patterns for a player, calculates priority scores
@@ -203,12 +197,12 @@ class StudyPlanGenerator:
         """Delete existing study plans and mapped concepts before regeneration."""
         # First delete study sessions (they reference study_plans via FK)
         study_plan_ids = [
-            sp.id for sp in self.db_session.query(StudyPlan).filter(
-                StudyPlan.user_id == username
-            ).all()
+            sp.id
+            for sp in self.db_session.query(StudyPlan).filter(StudyPlan.user_id == username).all()
         ]
         if study_plan_ids:
             from src.chess_analyzer.database.models import StudySession
+
             self.db_session.query(StudySession).filter(
                 StudySession.study_plan_id.in_(study_plan_ids)
             ).delete(synchronize_session=False)

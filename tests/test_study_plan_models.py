@@ -281,9 +281,9 @@ class TestConceptMapModel:
         test_db.commit()
         test_db.refresh(concept_map)
 
-        result = test_db.query(ConceptMap).filter(
-            ConceptMap.weakness_id == sample_pattern.id
-        ).first()
+        result = (
+            test_db.query(ConceptMap).filter(ConceptMap.weakness_id == sample_pattern.id).first()
+        )
         assert result is not None
         assert result.weakness_id == sample_pattern.id
 
@@ -298,9 +298,9 @@ class TestConceptMapModel:
         test_db.commit()
 
         # Query by weakness_id to verify index
-        result = test_db.query(ConceptMap).filter(
-            ConceptMap.weakness_id == sample_pattern.id
-        ).first()
+        result = (
+            test_db.query(ConceptMap).filter(ConceptMap.weakness_id == sample_pattern.id).first()
+        )
         assert result is not None
 
     def test_concept_map_concept_index(self, test_db, sample_pattern):
@@ -314,9 +314,7 @@ class TestConceptMapModel:
         test_db.commit()
 
         # Query by concept_name to verify index
-        result = test_db.query(ConceptMap).filter(
-            ConceptMap.concept_name == "Fork"
-        ).first()
+        result = test_db.query(ConceptMap).filter(ConceptMap.concept_name == "Fork").first()
         assert result is not None
         assert result.concept_name == "Fork"
 
@@ -336,9 +334,9 @@ class TestConceptMapModel:
         test_db.add(concept2)
         test_db.commit()
 
-        results = test_db.query(ConceptMap).filter(
-            ConceptMap.weakness_id == sample_pattern.id
-        ).all()
+        results = (
+            test_db.query(ConceptMap).filter(ConceptMap.weakness_id == sample_pattern.id).all()
+        )
         assert len(results) == 2
 
 
@@ -450,9 +448,9 @@ class TestStudySessionModel:
         test_db.commit()
 
         # Query by study_plan_id to verify index
-        result = test_db.query(StudySession).filter(
-            StudySession.study_plan_id == study_plan.id
-        ).first()
+        result = (
+            test_db.query(StudySession).filter(StudySession.study_plan_id == study_plan.id).first()
+        )
         assert result is not None
         assert result.study_plan_id == study_plan.id
 

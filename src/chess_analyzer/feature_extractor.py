@@ -53,8 +53,7 @@ class FeatureExtractor:
         """Classify a position into opening, middlegame, or endgame."""
         board = chess.Board(fen)
         major_minor_count = sum(
-            len(board.pieces(piece_type, chess.WHITE))
-            + len(board.pieces(piece_type, chess.BLACK))
+            len(board.pieces(piece_type, chess.WHITE)) + len(board.pieces(piece_type, chess.BLACK))
             for piece_type in (
                 chess.KNIGHT,
                 chess.BISHOP,
@@ -62,9 +61,8 @@ class FeatureExtractor:
                 chess.QUEEN,
             )
         )
-        queens_remaining = (
-            len(board.pieces(chess.QUEEN, chess.WHITE))
-            + len(board.pieces(chess.QUEEN, chess.BLACK))
+        queens_remaining = len(board.pieces(chess.QUEEN, chess.WHITE)) + len(
+            board.pieces(chess.QUEEN, chess.BLACK)
         )
 
         if move_number <= 20:

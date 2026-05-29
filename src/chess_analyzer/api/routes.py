@@ -122,11 +122,7 @@ def _build_accuracy_by_phase(positions: list[Position]) -> dict[str, float]:
         else:
             phase_buckets["middlegame"].append(_estimate_move_accuracy(position.evaluation_loss))
 
-    return {
-        phase: float(mean(values))
-        for phase, values in phase_buckets.items()
-        if values
-    }
+    return {phase: float(mean(values)) for phase, values in phase_buckets.items() if values}
 
 
 def _build_weakness_summary(db: Session, username: str) -> list[dict[str, object]]:
@@ -153,63 +149,44 @@ def _clear_player_analysis_data(db: Session, username: str) -> None:
     """Delete existing analysis artifacts for a user before re-analysis."""
     pattern_ids = [
         pattern_id
-        for (pattern_id,) in db.query(Pattern.id)
-        .filter(Pattern.player_username == username)
-        .all()
+        for (pattern_id,) in db.query(Pattern.id).filter(Pattern.player_username == username).all()
     ]
     study_plan_ids = [
         study_plan_id
-        for (study_plan_id,) in db.query(StudyPlan.id)
-        .filter(StudyPlan.user_id == username)
-        .all()
+        for (study_plan_id,) in db.query(StudyPlan.id).filter(StudyPlan.user_id == username).all()
     ]
-    game_ids = [
-        game_id
-        for (game_id,) in db.query(Game.id).filter(Game.username == username).all()
-    ]
+    game_ids = [game_id for (game_id,) in db.query(Game.id).filter(Game.username == username).all()]
     position_ids: list[int] = []
     if game_ids:
         position_ids = [
             position_id
-            for (position_id,) in db.query(Position.id)
-            .filter(Position.game_id.in_(game_ids))
-            .all()
+            for (position_id,) in db.query(Position.id).filter(Position.game_id.in_(game_ids)).all()
         ]
 
     if study_plan_ids:
         db.query(StudySession).filter(StudySession.study_plan_id.in_(study_plan_ids)).delete(
             synchronize_session=False
         )
-    db.query(StudyPlan).filter(StudyPlan.user_id == username).delete(
-        synchronize_session=False
-    )
+    db.query(StudyPlan).filter(StudyPlan.user_id == username).delete(synchronize_session=False)
 
     if pattern_ids:
         db.query(ConceptMap).filter(ConceptMap.weakness_id.in_(pattern_ids)).delete(
             synchronize_session=False
         )
-    db.query(Pattern).filter(Pattern.player_username == username).delete(
-        synchronize_session=False
-    )
-    db.query(Stats).filter(Stats.player_username == username).delete(
-        synchronize_session=False
-    )
+    db.query(Pattern).filter(Pattern.player_username == username).delete(synchronize_session=False)
+    db.query(Stats).filter(Stats.player_username == username).delete(synchronize_session=False)
 
     if game_ids:
         db.query(MovePrediction).filter(MovePrediction.game_id.in_(game_ids)).delete(
             synchronize_session=False
         )
-        db.query(Anomaly).filter(Anomaly.game_id.in_(game_ids)).delete(
-            synchronize_session=False
-        )
+        db.query(Anomaly).filter(Anomaly.game_id.in_(game_ids)).delete(synchronize_session=False)
     if position_ids:
         db.query(Embedding).filter(Embedding.position_id.in_(position_ids)).delete(
             synchronize_session=False
         )
     if game_ids:
-        db.query(Position).filter(Position.game_id.in_(game_ids)).delete(
-            synchronize_session=False
-        )
+        db.query(Position).filter(Position.game_id.in_(game_ids)).delete(synchronize_session=False)
     db.query(Game).filter(Game.username == username).delete(synchronize_session=False)
     db.flush()
 
@@ -491,30 +468,25 @@ async def get_advanced_analysis_status(job_id: str, db: DbSession):
         raise HTTPException(status_code=404, detail="Job not found")
 
     game_ids = [
-        game_id
-        for (game_id,) in db.query(Game.id).filter(Game.username == job.username).all()
+        game_id for (game_id,) in db.query(Game.id).filter(Game.username == job.username).all()
     ]
     position_ids: list[int] = []
     if game_ids:
         position_ids = [
             position_id
-            for (position_id,) in db.query(Position.id)
-            .filter(Position.game_id.in_(game_ids))
-            .all()
+            for (position_id,) in db.query(Position.id).filter(Position.game_id.in_(game_ids)).all()
         ]
 
     unusual_moves = 0
     anomalies = 0
     embeddings = 0
     if game_ids:
-        unusual_moves = db.query(MovePrediction).filter(
-            MovePrediction.game_id.in_(game_ids)
-        ).count()
+        unusual_moves = (
+            db.query(MovePrediction).filter(MovePrediction.game_id.in_(game_ids)).count()
+        )
         anomalies = db.query(Anomaly).filter(Anomaly.game_id.in_(game_ids)).count()
     if position_ids:
-        embeddings = db.query(Embedding).filter(
-            Embedding.position_id.in_(position_ids)
-        ).count()
+        embeddings = db.query(Embedding).filter(Embedding.position_id.in_(position_ids)).count()
 
     return AdvancedAnalysisStatusResponse(
         job_id=str(job.job_id),
@@ -630,9 +602,9 @@ async def get_pattern_details(pattern_id: int, db: DbSession):
     unusual_moves = 0
     anomalies = 0
     if game_ids:
-        unusual_moves = db.query(MovePrediction).filter(
-            MovePrediction.game_id.in_(game_ids)
-        ).count()
+        unusual_moves = (
+            db.query(MovePrediction).filter(MovePrediction.game_id.in_(game_ids)).count()
+        )
         anomalies = db.query(Anomaly).filter(Anomaly.game_id.in_(game_ids)).count()
 
     similar_patterns = (
@@ -732,11 +704,7 @@ def list_study_plans(
                 for pattern in db.query(Pattern).filter(Pattern.id.in_(weakness_ids)).all()
             }
         if weakness_ids:
-            concepts = (
-                db.query(ConceptMap)
-                .filter(ConceptMap.weakness_id.in_(weakness_ids))
-                .all()
-            )
+            concepts = db.query(ConceptMap).filter(ConceptMap.weakness_id.in_(weakness_ids)).all()
             for concept in concepts:
                 concept_counts[concept.weakness_id] = concept_counts.get(concept.weakness_id, 0) + 1
 
@@ -851,8 +819,7 @@ def get_study_plan_concepts(study_plan_id: str, db: DbSession):
 
         concept_maps = db.query(ConceptMap).filter(ConceptMap.weakness_id == plan.weakness_id).all()
         concepts = [
-            {"type": concept.concept_type, "name": concept.concept_name}
-            for concept in concept_maps
+            {"type": concept.concept_type, "name": concept.concept_name} for concept in concept_maps
         ]
         return ConceptListResponse(concepts=concepts)
     except HTTPException:

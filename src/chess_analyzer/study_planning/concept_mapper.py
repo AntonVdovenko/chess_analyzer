@@ -15,36 +15,36 @@ class ConceptMapper:
         self.theory_concepts = {
             "weak_squares": {
                 "description": "Squares that opponent can exploit",
-                "indicators": ["isolated", "backward", "hole"]
+                "indicators": ["isolated", "backward", "hole"],
             },
             "piece_coordination": {
                 "description": "Pieces not working together",
-                "indicators": ["uncoordinated", "passive"]
+                "indicators": ["uncoordinated", "passive"],
             },
             "pawn_structure": {
                 "description": "Weak pawn formation",
-                "indicators": ["damaged", "weak_pawns"]
+                "indicators": ["damaged", "weak_pawns"],
             },
             "king_safety": {
                 "description": "Exposed king position",
-                "indicators": ["exposed", "uncastled"]
+                "indicators": ["exposed", "uncastled"],
             },
             "tempo": {
                 "description": "Time advantage loss",
-                "indicators": ["slow", "wasteful_moves"]
+                "indicators": ["slow", "wasteful_moves"],
             },
             "material_balance": {
                 "description": "Piece value imbalance",
-                "indicators": ["material_loss"]
+                "indicators": ["material_loss"],
             },
             "tactics": {
                 "description": "Tactical motifs (pins, forks, etc)",
-                "indicators": ["tactical", "blunder", "hanging"]
+                "indicators": ["tactical", "blunder", "hanging"],
             },
             "strategy": {
                 "description": "Strategic positioning",
-                "indicators": ["positional", "maneuvering"]
-            }
+                "indicators": ["positional", "maneuvering"],
+            },
         }
 
         # Opening concepts
@@ -56,7 +56,7 @@ class ConceptMapper:
             "italian_game": "1.e4 e5 2.Nf3 Nc6 3.Bc4",
             "english_opening": "1.c4",
             "queens_gambit": "1.d4 d5 2.c4",
-            "other": "Other openings"
+            "other": "Other openings",
         }
 
         # Position type concepts
@@ -67,7 +67,7 @@ class ConceptMapper:
             "rook_endgame": {"description": "Rook endgame"},
             "opposite_bishops": {"description": "Opposite colored bishops"},
             "passed_pawns": {"description": "Passed pawn positions"},
-            "pawn_endgame": {"description": "Pawn-only endgame"}
+            "pawn_endgame": {"description": "Pawn-only endgame"},
         }
 
     def map_weakness(self, pattern: Any) -> list[dict]:
@@ -111,7 +111,7 @@ class ConceptMapper:
         concepts = []
 
         # Validate pattern has required attributes
-        if not hasattr(pattern, 'type'):
+        if not hasattr(pattern, "type"):
             logger.warning("Pattern missing required 'type' attribute")
             return []
 
@@ -127,20 +127,20 @@ class ConceptMapper:
             logger.warning(f"Unknown pattern type: {pattern.type}")
 
         # 2. Map opening concepts
-        if hasattr(pattern, 'opening') and pattern.opening:
+        if hasattr(pattern, "opening") and pattern.opening:
             opening_name = pattern.opening.lower().replace(" ", "_")
             if opening_name in self.opening_concepts:
                 concepts.append({"type": "opening", "name": opening_name})
             else:
                 logger.warning(f"Unknown opening encountered: {opening_name}")
                 concepts.append({"type": "opening", "name": "other"})
-        elif hasattr(pattern, 'opening'):
+        elif hasattr(pattern, "opening"):
             logger.warning("Pattern has 'opening' attribute but it is None or empty")
 
         # 3. Map position type concepts based on endgame_type first (most reliable)
         # Then use CPL heuristic as fallback
         endgame_mapped = False
-        if hasattr(pattern, 'endgame_type') and pattern.endgame_type:
+        if hasattr(pattern, "endgame_type") and pattern.endgame_type:
             endgame_name = pattern.endgame_type.lower().replace(" ", "_")
             if endgame_name in self.position_concepts:
                 concepts.append({"type": "position_type", "name": endgame_name})
@@ -149,7 +149,7 @@ class ConceptMapper:
                 logger.warning(f"Unknown endgame_type: {pattern.endgame_type}")
 
         # Use CPL as fallback if no specific endgame type was found
-        if not endgame_mapped and hasattr(pattern, 'avg_cpl'):
+        if not endgame_mapped and hasattr(pattern, "avg_cpl"):
             if pattern.avg_cpl is not None:
                 # Heuristic: avg_cpl < 150 indicates simpler position (endgame)
                 # Lower CPL = fewer significant errors = simpler position
@@ -166,7 +166,7 @@ class ConceptMapper:
         seen = set()
         unique_concepts = []
         for concept in concepts:
-            key = (concept['type'], concept['name'])
+            key = (concept["type"], concept["name"])
             if key not in seen:
                 seen.add(key)
                 unique_concepts.append(concept)

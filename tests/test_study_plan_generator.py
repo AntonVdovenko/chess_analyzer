@@ -1,6 +1,5 @@
 """Tests for StudyPlanGenerator class."""
 
-
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -136,7 +135,7 @@ class TestStudyPlanGeneratorInit:
         generator = StudyPlanGenerator(test_db)
 
         assert generator.db_session is test_db
-        assert hasattr(generator, 'concept_mapper')
+        assert hasattr(generator, "concept_mapper")
         assert generator.concept_mapper is not None
 
 
@@ -233,9 +232,7 @@ class TestGenerateStudyPlan:
         assert "priority_distribution" in result
 
         # Verify StudyPlan records were created
-        study_plans = test_db.query(StudyPlan).filter(
-            StudyPlan.user_id == "testplayer"
-        ).all()
+        study_plans = test_db.query(StudyPlan).filter(StudyPlan.user_id == "testplayer").all()
         assert len(study_plans) == len(sample_patterns)
 
     def test_generate_study_plan_priority_scores(self, test_db, sample_patterns):
@@ -243,9 +240,7 @@ class TestGenerateStudyPlan:
         generator = StudyPlanGenerator(test_db)
         generator.generate_study_plan("testplayer", game_limit=100)
 
-        study_plans = test_db.query(StudyPlan).filter(
-            StudyPlan.user_id == "testplayer"
-        ).all()
+        study_plans = test_db.query(StudyPlan).filter(StudyPlan.user_id == "testplayer").all()
 
         # Verify all study plans have priority scores in range [0, 10]
         for sp in study_plans:
@@ -265,9 +260,7 @@ class TestGenerateStudyPlan:
         generator = StudyPlanGenerator(test_db)
         generator.generate_study_plan("testplayer", game_limit=100)
 
-        study_plans = test_db.query(StudyPlan).filter(
-            StudyPlan.user_id == "testplayer"
-        ).all()
+        study_plans = test_db.query(StudyPlan).filter(StudyPlan.user_id == "testplayer").all()
 
         for sp in study_plans:
             assert sp.status == "active"
@@ -298,12 +291,8 @@ class TestGenerateStudyPlan:
         assert result1["username"] == "testplayer"
         assert result2["username"] == "otherplayer"
 
-        plans1 = test_db.query(StudyPlan).filter(
-            StudyPlan.user_id == "testplayer"
-        ).all()
-        plans2 = test_db.query(StudyPlan).filter(
-            StudyPlan.user_id == "otherplayer"
-        ).all()
+        plans1 = test_db.query(StudyPlan).filter(StudyPlan.user_id == "testplayer").all()
+        plans2 = test_db.query(StudyPlan).filter(StudyPlan.user_id == "otherplayer").all()
 
         assert len(plans1) == len(sample_patterns)
         assert len(plans2) == 1

@@ -76,6 +76,6 @@ def test_anomaly_detector_get_anomalies():
 
     # Should detect some anomalies (at least some of the high-loss positions)
     assert len(anomalies) > 0
-    assert all('anomaly_score' in a for a in anomalies)
-    assert all('centipawn_loss' in a for a in anomalies)
-    assert all('reason' in a for a in anomalies)
+    assert all("anomaly_score" in a for a in anomalies)
+    assert all("centipawn_loss" in a for a in anomalies)
+    assert all("reason" in a for a in anomalies)

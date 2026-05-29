@@ -2,6 +2,8 @@
 
 from unittest.mock import Mock, patch
 
+import chess
+import chess.engine
 import pytest
 
 from src.chess_analyzer.position_analyzer import PositionAnalyzer
@@ -30,12 +32,11 @@ def test_calculate_centipawn_loss_zero(analyzer_with_mock_engine):
     assert loss == 0.0
 
 
-def test_calculate_centipawn_loss_symmetric(analyzer_with_mock_engine):
-    """Test centipawn loss is symmetric."""
+def test_calculate_centipawn_loss_ignores_improvements(analyzer_with_mock_engine):
+    """Test that improving moves have no centipawn loss."""
     analyzer = analyzer_with_mock_engine
-    loss1 = analyzer.calculate_centipawn_loss(eval_before=0.0, eval_after=1.5)
-    loss2 = analyzer.calculate_centipawn_loss(eval_before=1.5, eval_after=0.0)
-    assert loss1 == loss2 == 150.0
+    loss = analyzer.calculate_centipawn_loss(eval_before=0.0, eval_after=1.5)
+    assert loss == 0.0
 
 
 def test_analyze_position_returns_best_move(analyzer_with_mock_engine):
@@ -64,6 +65,24 @@ def test_analyze_position_returns_best_move(analyzer_with_mock_engine):
     assert isinstance(result["evaluation"], float)
     assert result["best_move"] == "e2e4"
     assert result["evaluation"] == 0.5
+
+
+def test_analyze_position_uses_requested_evaluation_perspective(analyzer_with_mock_engine):
+    """Test that PovScore values are converted from the requested side's perspective."""
+    analyzer = analyzer_with_mock_engine
+    fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
+    analyzer.engine.analyse.return_value = {
+        "pv": [],
+        "score": chess.engine.PovScore(chess.engine.Cp(50), chess.BLACK),
+        "depth": 20,
+    }
+
+    white_result = analyzer.analyze_position(fen, depth=10, perspective="white")
+    black_result = analyzer.analyze_position(fen, depth=10, perspective="black")
+
+    assert white_result["evaluation"] == -0.5
+    assert black_result["evaluation"] == 0.5
 
 
 def test_get_acpl(analyzer_with_mock_engine):

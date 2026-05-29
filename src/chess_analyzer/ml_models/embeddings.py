@@ -154,10 +154,7 @@ class PositionEmbedder:
             return []
 
         similarities = np.array(
-            [
-                self.get_similarity_score(embedding, candidate)
-                for candidate in all_embeddings
-            ]
+            [self.get_similarity_score(embedding, candidate) for candidate in all_embeddings]
         )
         sorted_indices = np.argsort(-similarities, kind="stable")
         return sorted_indices[:k].tolist()

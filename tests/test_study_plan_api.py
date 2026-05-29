@@ -130,6 +130,7 @@ def test_db():
 @pytest.fixture
 def client(test_db):
     """Create FastAPI test client with test database."""
+
     def override_get_db():
         yield test_db
 
@@ -278,9 +279,9 @@ class TestListStudyPlansEndpoint:
     def test_list_study_plans_filter_by_status(self, client, test_db, sample_study_plans):
         """Test listing study plans filtered by status."""
         # Update one plan to completed
-        test_db.query(StudyPlan).filter(
-            StudyPlan.id == sample_study_plans[1].id
-        ).update({"status": "completed"})
+        test_db.query(StudyPlan).filter(StudyPlan.id == sample_study_plans[1].id).update(
+            {"status": "completed"}
+        )
         test_db.commit()
 
         response = client.get("/api/study-plan?user_id=testplayer&status=active")
@@ -298,9 +299,7 @@ class TestListStudyPlansEndpoint:
 
     def test_list_study_plans_with_sorting(self, client, sample_study_plans):
         """Test listing study plans with sorting."""
-        response = client.get(
-            "/api/study-plan?user_id=testplayer&sort_by=priority_score"
-        )
+        response = client.get("/api/study-plan?user_id=testplayer&sort_by=priority_score")
         assert response.status_code == 200
         plans = response.json()
         assert len(plans) == 2
@@ -358,9 +357,9 @@ class TestProgressEndpoint:
     def test_get_study_progress_completion_rate(self, client, test_db, sample_study_plans):
         """Test completion rate calculation."""
         # Mark one plan as completed
-        test_db.query(StudyPlan).filter(
-            StudyPlan.id == sample_study_plans[1].id
-        ).update({"status": "completed", "marked_studied_at": datetime.now(UTC)})
+        test_db.query(StudyPlan).filter(StudyPlan.id == sample_study_plans[1].id).update(
+            {"status": "completed", "marked_studied_at": datetime.now(UTC)}
+        )
         test_db.commit()
 
         response = client.get("/api/study-plan/progress?user_id=testplayer")
@@ -373,7 +372,9 @@ class TestProgressEndpoint:
 class TestConceptsEndpoint:
     """Test GET /api/study-plan/concepts endpoint."""
 
-    def test_get_concepts_for_study_plan(self, client, test_db, sample_study_plans, sample_concepts):
+    def test_get_concepts_for_study_plan(
+        self, client, test_db, sample_study_plans, sample_concepts
+    ):
         """Test getting concepts for a study plan."""
         plan_id = str(sample_study_plans[0].id)
         response = client.get(f"/api/study-plan/{plan_id}/concepts")

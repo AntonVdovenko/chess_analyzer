@@ -14,11 +14,7 @@ class AnomalyDetector:
             contamination: Expected fraction of anomalies (0.1 = top 10%)
         """
         self.contamination = contamination
-        self.model = IsolationForest(
-            contamination=contamination,
-            random_state=42,
-            n_estimators=100
-        )
+        self.model = IsolationForest(contamination=contamination, random_state=42, n_estimators=100)
         self.scaler = StandardScaler()
         self.is_fitted = False
 
@@ -36,11 +32,11 @@ class AnomalyDetector:
 
         for position in positions:
             # Feature 1: Centipawn loss (evaluation_loss from database)
-            cpl = getattr(position, 'evaluation_loss', 0.0) or 0.0
+            cpl = getattr(position, "evaluation_loss", 0.0) or 0.0
 
             # Feature 2: Evaluation drop (absolute difference between before and after)
-            eval_before = getattr(position, 'evaluation_before', 0.0) or 0.0
-            eval_after = getattr(position, 'evaluation_after', 0.0) or 0.0
+            eval_before = getattr(position, "evaluation_before", 0.0) or 0.0
+            eval_after = getattr(position, "evaluation_after", 0.0) or 0.0
             eval_drop = abs(eval_before - eval_after)
 
             # Feature 3: King exposure proxy (use evaluation_loss as a proxy)
@@ -100,7 +96,7 @@ class AnomalyDetector:
             return 0.0
 
         # Check if scaler was fitted (it won't be if fit was called with empty positions)
-        if not hasattr(self.scaler, 'mean_'):
+        if not hasattr(self.scaler, "mean_"):
             return 0.0
 
         scaled = self.scaler.transform(features)
@@ -129,7 +125,7 @@ class AnomalyDetector:
             score = self.predict(position)
 
             if score >= threshold:
-                cpl = getattr(position, 'evaluation_loss', 0.0) or 0.0
+                cpl = getattr(position, "evaluation_loss", 0.0) or 0.0
 
                 # Categorize the anomaly
                 if cpl > 300:
@@ -139,11 +135,13 @@ class AnomalyDetector:
                 else:
                     reason = "unusual move"
 
-                anomalies.append({
-                    "position_fen": position.fen,
-                    "anomaly_score": score,
-                    "centipawn_loss": cpl,
-                    "reason": reason
-                })
+                anomalies.append(
+                    {
+                        "position_fen": position.fen,
+                        "anomaly_score": score,
+                        "centipawn_loss": cpl,
+                        "reason": reason,
+                    }
+                )
 
         return anomalies
