@@ -51,12 +51,8 @@ jobs:
           if [ -n "$VERSION" ]; then
             echo "released=true" >> $GITHUB_OUTPUT
             echo "version=$VERSION" >> $GITHUB_OUTPUT
-            uv run semantic-release version --no-push
-            uv lock --upgrade-package Chess Analyzer
-            git add uv.lock
-            git commit --amend --no-edit
-            git tag -f "v$VERSION"
-            git push origin main --tags
+            uv run semantic-release version --no-push --no-vcs-release --skip-build
+            git push origin main --follow-tags
           else
             echo "released=false" >> $GITHUB_OUTPUT
           fi
