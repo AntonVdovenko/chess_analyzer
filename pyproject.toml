@@ -114,7 +114,6 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["chess_analyzer"]
-known-first-party = ["chess_analyzer"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG", "PLR2004"]
